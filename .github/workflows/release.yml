@@ -30,6 +30,12 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'  # 使用 Eclipse Temurin JDK
+          java-version: '17'       # 指定 Java 17 版本
+
       # Web 构建
       - name: Build Web
         if: matrix.os == 'ubuntu-latest'
