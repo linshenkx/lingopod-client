@@ -1,0 +1,11 @@
+{
+    "java.enabled": false,
+    "java.debug.enabled": false,
+    "java.configuration.enabled": false,
+    "java.compile.enabled": false,
+    "java.project.enabled": false,
+    "java.requirements.enabled": false,
+    "java.completion.enabled": false,
+    "java.server.enabled": false,
+    "redhat.telemetry.enabled": false
+}
