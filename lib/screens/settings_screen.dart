@@ -110,33 +110,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               if (url.isEmpty) return;
                               
                               try {
-                                final (success, message) = await context
-                                    .read<SettingsProvider>()
-                                    .testConnection(url);
-                                    
-                                if (!context.mounted) return;
+                                await context.read<SettingsProvider>().setBaseUrl(url);
+                                await context.read<AudioProvider>().refreshPodcastList();
                                 
-                                if (success) {
-                                  await context
-                                      .read<SettingsProvider>()
-                                      .setBaseUrl(url);
-                                  await context.read<AudioProvider>().refreshPodcastList();
-                                  
-                                  if (!context.mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('保存成功'),
-                                      backgroundColor: Colors.green,
-                                    ),
-                                  );
-                                } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('保存失败：$message'),
-                                      backgroundColor: Colors.red,
-                                    ),
-                                  );
-                                }
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('保存成功'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
                               } catch (e) {
                                 if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(

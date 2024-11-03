@@ -18,6 +18,11 @@ jobs:
           channel: 'stable'
           cache: true
       
+      - name: Setup Gradle Properties
+        run: |
+          Copy-Item android/gradle.properties.template android/gradle.properties
+          Get-Content android/gradle.properties
+      
       - name: Install Dependencies
         run: flutter pub get
 
@@ -102,55 +107,56 @@ jobs:
       - name: Package Release Files
         run: |
           Write-Host "开始打包发布文件..."
+          
+          # 创建发布目录
           New-Item -ItemType Directory -Force -Path release
+          Write-Host "创建发布目录: release"
           
-          # 打包 Windows
-          Write-Host "正在处理 Windows 文件..."
-          $windowsBuildPath = "build/windows/x64/runner/Release"
-          
-          if (Test-Path $windowsBuildPath) {
-              Write-Host "找到 Windows 构建目录: $windowsBuildPath"
-              Write-Host "目录内容:"
-              Get-ChildItem -Path $windowsBuildPath -Recurse
-              
-              $tempDir = "temp_windows"
-              New-Item -ItemType Directory -Force -Path $tempDir
-              
-              # 复制所有文件
-              Copy-Item "$windowsBuildPath/*" -Destination $tempDir -Recurse
-              
-              Write-Host "临时目录内容:"
-              Get-ChildItem -Path $tempDir -Recurse
-              
-              # 创建压缩包
-              Compress-Archive -Path "$tempDir/*" -DestinationPath "release/lingopod-windows.zip" -Force
-              
-              # 验证压缩包
-              if (Test-Path "release/lingopod-windows.zip") {
-                  Write-Host "✅ Windows 压缩包创建成功"
-                  Write-Host "大小: $((Get-Item 'release/lingopod-windows.zip').length / 1MB) MB"
+          # 打包 APK（移到最前面）
+          Write-Host "`n正在处理 APK..."
+          $apkPath = "build/app/outputs/flutter-apk/app-release.apk"
+          Write-Host "检查 APK 路径: $apkPath"
+          if (Test-Path $apkPath) {
+              Write-Host "找到 APK 文件"
+              Copy-Item $apkPath -Destination "release/lingopod-android.apk" -Force
+              if (Test-Path "release/lingopod-android.apk") {
+                  $apkSize = (Get-Item "release/lingopod-android.apk").Length / 1MB
+                  Write-Host "✅ APK 复制成功，大小: $apkSize MB"
               } else {
-                  Write-Host "❌ Windows 压缩包创建失败"
+                  Write-Host "❌ APK 复制失败"
                   exit 1
               }
-              
-              # 清理临时目录
-              Remove-Item -Path $tempDir -Recurse -Force
           } else {
-              Write-Host "❌ 未找到 Windows 构建目录: $windowsBuildPath"
-              Write-Host "可用的构建目录:"
-              Get-ChildItem -Path "build/windows" -Recurse
+              Write-Host "❌ APK 文件未找到，检查构建目录..."
+              Write-Host "APK 输出目录内容："
+              Get-ChildItem -Path "build/app/outputs/flutter-apk" -ErrorAction SilentlyContinue
               exit 1
           }
           
-          # 打包 Web
-          Write-Host "正在处理 Web 文件..."
-          Compress-Archive -Path "build/web/*" -DestinationPath "release/lingopod-web.zip" -Force
+          # Windows 打包（保持不变）
+          Write-Host "`n正在处理 Windows 文件..."
+          $windowsBuildPath = "build/windows/x64/runner/Release"
+          if (Test-Path $windowsBuildPath) {
+              $tempDir = "temp_windows"
+              New-Item -ItemType Directory -Force -Path $tempDir
+              Copy-Item "$windowsBuildPath/*" -Destination $tempDir -Recurse
+              Compress-Archive -Path "$tempDir/*" -DestinationPath "release/lingopod-windows.zip" -Force
+              Remove-Item -Path $tempDir -Recurse -Force
+              Write-Host "✅ Windows 文件打包完成"
+          }
           
-          # 验证最终结果
-          Write-Host "发布文件打包完成，检查结果："
+          # Web 打包（保持不变）
+          Write-Host "`n正在处理 Web 文件..."
+          if (Test-Path "build/web") {
+              Compress-Archive -Path "build/web/*" -DestinationPath "release/lingopod-web.zip" -Force
+              Write-Host "✅ Web 文件打包完成"
+          }
+          
+          # 显示最终结果
+          Write-Host "`n发布目录最终内容:"
           Get-ChildItem -Path "release" | ForEach-Object {
-              Write-Host "- $($_.Name): $($_.Length / 1MB) MB"
+              $size = $_.Length / 1MB
+              Write-Host "- $($_.Name): $size MB"
           }
 
       # 创建 GitHub Release
