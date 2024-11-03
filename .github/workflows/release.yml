@@ -31,49 +31,105 @@ jobs:
       - name: Install Windows build dependencies
         run: flutter config --enable-windows-desktop
 
-      # 构建 APK
-      - name: Build Android APK
-        run: flutter build apk --release
-      
-      # 构建 Windows
+      # 首先构建 Windows
       - name: Build Windows
         run: |
+          Write-Host "开始 Windows 构建..."
           flutter config --enable-windows-desktop
+          flutter create --platforms=windows .
           flutter build windows --release
+          
+          # 验证 Windows 构建
+          Write-Host "检查 Windows 构建输出..."
+          $windowsPaths = @(
+              "build/windows/x64/x64/Release",
+              "build/windows/runner/Release",
+              "build/windows/x64/runner/Release"
+          )
+          
+          $buildFound = $false
+          foreach ($path in $windowsPaths) {
+              if (Test-Path $path) {
+                  Write-Host "✅ Windows 构建成功: $path"
+                  Write-Host "文件列表:"
+                  Get-ChildItem -Path $path -Recurse
+                  $buildFound = $true
+                  break
+              }
+          }
+          
+          if (-not $buildFound) {
+              Write-Host "❌ Windows 构建失败，未找到构建目录"
+              Write-Host "当前 build/windows 目录结构："
+              Get-ChildItem -Path "build/windows" -Recurse
+              exit 1
+          }
       
-      # 构建 Web
+      # 然后构建 Web（因为通常比较快）
       - name: Build Web
-        run: flutter build web --release
+        run: |
+          Write-Host "开始 Web 构建..."
+          flutter build web --release
+          
+          # 验证 Web 构建
+          $webPath = "build/web"
+          if (Test-Path $webPath) {
+              Write-Host "✅ Web 构建成功"
+              Write-Host "Web 构建文件列表:"
+              Get-ChildItem -Path $webPath -Recurse
+          } else {
+              Write-Host "❌ Web 构建失败，目录不存在"
+              exit 1
+          }
+      
+      # 最后构建 APK（因为最耗时）
+      - name: Build Android APK
+        run: |
+          Write-Host "开始 APK 构建..."
+          flutter build apk --release
+          
+          # 验证 APK 构建
+          $apkPath = "build/app/outputs/flutter-apk/app-release.apk"
+          if (Test-Path $apkPath) {
+              Write-Host "✅ APK 构建成功: $apkPath"
+              Write-Host "APK 大小: $((Get-Item $apkPath).length / 1MB) MB"
+          } else {
+              Write-Host "❌ APK 构建失败，文件不存在"
+              exit 1
+          }
       
       # 打包发布文件
       - name: Package Release Files
         run: |
-          # 创建发布目录
+          Write-Host "开始打包发布文件..."
           New-Item -ItemType Directory -Force -Path release
           
-          # 移动 APK
+          # 打包 APK
+          Write-Host "正在处理 APK..."
           Copy-Item "build/app/outputs/flutter-apk/app-release.apk" -Destination "release/lingopod-android.apk"
           
-          # 检查并打包 Windows 文件（添加错误处理）
-          if (Test-Path "build/windows/runner/Release") {
-              Compress-Archive -Path "build/windows/runner/Release/*" -DestinationPath "release/lingopod-windows.zip" -Force
-          } else {
-              Write-Host "Windows build directory not found. Checking current directory structure:"
-              Get-ChildItem -Path "build" -Recurse | Select-Object FullName
-              exit 1
+          # 打包 Windows
+          Write-Host "正在处理 Windows 文件..."
+          $windowsBuildPath = "build/windows/x64/x64/Release"
+          if (Test-Path $windowsBuildPath) {
+              $tempDir = "temp_windows"
+              New-Item -ItemType Directory -Force -Path $tempDir
+              Copy-Item "$windowsBuildPath/*.exe" -Destination $tempDir -ErrorAction SilentlyContinue
+              Copy-Item "$windowsBuildPath/*.dll" -Destination $tempDir -ErrorAction SilentlyContinue
+              Copy-Item "$windowsBuildPath/data" -Destination "$tempDir/data" -Recurse -ErrorAction SilentlyContinue
+              Compress-Archive -Path "$tempDir/*" -DestinationPath "release/lingopod-windows.zip" -Force
+              Remove-Item -Path $tempDir -Recurse -Force
           }
           
-          # 检查并打包 Web 文件（添加错误处理）
-          if (Test-Path "build/web") {
-              Compress-Archive -Path "build/web/*" -DestinationPath "release/lingopod-web.zip" -Force
-          } else {
-              Write-Host "Web build directory not found"
-              exit 1
-          }
+          # 打包 Web
+          Write-Host "正在处理 Web 文件..."
+          Compress-Archive -Path "build/web/*" -DestinationPath "release/lingopod-web.zip" -Force
           
-          # 显示最终的发布目录内容
-          Write-Host "Release directory contents:"
-          Get-ChildItem -Path "release"
+          # 验证最终结果
+          Write-Host "发布文件打包完成，检查结果："
+          Get-ChildItem -Path "release" | ForEach-Object {
+              Write-Host "- $($_.Name): $($_.Length / 1MB) MB"
+          }
 
       # 创建 GitHub Release
       - name: Create Release
