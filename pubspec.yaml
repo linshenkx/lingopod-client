@@ -1,5 +1,5 @@
-name: flutter_lingopod_app
-description: "LingoPod 译播客 Flutter 版本"
+name: lingopod_client
+description: "LingoPod 译播客 客户端"
 publish_to: 'none'
 version: 1.0.0+1
 
