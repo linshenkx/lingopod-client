@@ -175,7 +175,6 @@ class AudioProvider with ChangeNotifier {
         case PlayerState.completed:
           _isPlaying = false;
           _playerState = AudioPlayerState.none;
-          _onPlayComplete();
           break;
         default:
           _isPlaying = false;
@@ -183,7 +182,7 @@ class AudioProvider with ChangeNotifier {
       }
     });
 
-    // 播放完成监听
+    // 只在这里处理播放完成事件
     _audioService.onPlayerComplete.listen((_) {
       _isPlaying = false;
       _playerState = AudioPlayerState.none;
@@ -280,11 +279,18 @@ class AudioProvider with ChangeNotifier {
 
   Future<void> playPodcast(int index) async {
     try {
+      // 1. 先清空当前字幕
+      _subtitleEntries = [];
+      _currentChineseSubtitle = '';
+      _currentEnglishSubtitle = '';
+      chineseSubtitleNotifier.value = '';
+      englishSubtitleNotifier.value = '';
+      
       _currentIndex = index;
       _currentPodcast = _podcastList[index];
       final podcast = _podcastList[index];
       
-      // 加载字幕
+      // 2. 确保字幕完全加载后再播放音频
       final subtitleUrl = _currentLanguage == 'en' ? podcast.subtitleUrlEn : podcast.subtitleUrlCn;
       if (subtitleUrl != null) {
         try {
@@ -295,18 +301,21 @@ class AudioProvider with ChangeNotifier {
           print('字幕加载成功，共 ${_subtitleEntries.length} 条字幕');
         } catch (e) {
           print('加载字幕失败: $e');
+          // 字幕加载失败时清空字幕数据
+          _subtitleEntries = [];
         }
       }
       
-      // 加载音频
+      // 3. 加载音频
       final url = _currentLanguage == 'en' ? podcast.audioUrlEn : podcast.audioUrlCn;
       if (url != null) {
         try {
+          // 4. 先停止当前播放
+          await _audioService.stop();
+          
           if (kIsWeb) {
-            // Web平台：直接使用URL，不使用缓存
             await _audioService.setSource(UrlSource(url));
           } else {
-            // 非Web平台：使用缓存
             final audioFile = await _audioCacheManager.getSingleFile(url);
             await _audioService.setSource(DeviceFileSource(audioFile.path));
           }
