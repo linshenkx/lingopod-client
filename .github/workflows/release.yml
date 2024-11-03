@@ -7,16 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-        include:
-          - os: ubuntu-latest
-            output-name: linux
-          - os: windows-latest
-            output-name: windows
-
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       
@@ -38,41 +29,47 @@ jobs:
 
       # Web 构建
       - name: Build Web
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          flutter config --enable-web
-          flutter build web --release
-          cd build/web
-          zip -r ../../lingopod-web.zip ./*
+        run: flutter build web --release
         
       # Android APK 构建
       - name: Build Android APK
-        if: matrix.os == 'ubuntu-latest'
         run: flutter build apk --release
 
       # Windows EXE 构建
-      - name: Build Windows EXE
-        if: matrix.os == 'windows-latest'
-        run: |
-          flutter config --enable-windows-desktop
-          flutter build windows --release
-          cd build/windows/x64/runner/Release
-          7z a -tzip ../../../../../lingopod-windows.zip ./*
+      - name: Build Windows
+        run: flutter build windows --release
 
       # 确保构建文件被正确打包
       - name: Package Release Files
         run: |
           # 创建发布目录
-          mkdir release
+          New-Item -ItemType Directory -Force -Path release
           
-          # 移动 APK
-          cp build/app/outputs/flutter-apk/app-release.apk release/lingopod-android.apk
+          # 检查并显示构建目录内容
+          Write-Host "Checking build directories..."
+          Write-Host "APK directory:"
+          Get-ChildItem -Path "build/app/outputs/flutter-apk" -Recurse
+          
+          # 移动 APK（使用 -ErrorAction Continue 防止因为文件不存在而中断脚本）
+          Copy-Item "build/app/outputs/flutter-apk/app-release.apk" -Destination "release/lingopod-android.apk" -ErrorAction Continue
+          
+          # 检查 Windows 构建目录
+          Write-Host "Windows build directory:"
+          Get-ChildItem -Path "build/windows/runner/Release" -Recurse
           
           # 打包 Windows 文件
-          Compress-Archive -Path build/windows/runner/Release/* -DestinationPath release/lingopod-windows.zip
+          Compress-Archive -Path "build/windows/runner/Release/*" -DestinationPath "release/lingopod-windows.zip" -Force
+          
+          # 检查 Web 构建目录
+          Write-Host "Web build directory:"
+          Get-ChildItem -Path "build/web" -Recurse
           
           # 打包 Web 文件
-          Compress-Archive -Path build/web/* -DestinationPath release/lingopod-web.zip
+          Compress-Archive -Path "build/web/*" -DestinationPath "release/lingopod-web.zip" -Force
+          
+          # 显示最终的发布目录内容
+          Write-Host "Release directory contents:"
+          Get-ChildItem -Path "release"
 
       # 创建 GitHub Release
       - name: Create Release
