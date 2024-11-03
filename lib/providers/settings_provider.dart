@@ -46,7 +46,7 @@ class SettingsProvider extends ChangeNotifier {
     try {
       final uri = Uri.parse('$url${ApiConstants.getList}');
       final response = await http.get(uri).timeout(
-        const Duration(seconds: 5),
+        const Duration(seconds: 10),
         onTimeout: () {
           throw TimeoutException('连接超时');
         },

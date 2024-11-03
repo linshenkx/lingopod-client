@@ -137,13 +137,29 @@ class AudioProvider with ChangeNotifier {
   void _setupAudioServiceListeners() {
     // 位置更新监听
     _audioService.onPositionChanged.listen((position) {
-      _position = position;
-      positionNotifier.value = position;
-      
-      _updateSubtitlesAtPosition(position);
-      
-      if (_duration.inMilliseconds > 0) {
-        progressNotifier.value = position.inMilliseconds / _duration.inMilliseconds;
+      try {
+        _position = position;
+        positionNotifier.value = position;
+        
+        _updateSubtitlesAtPosition(position);
+        
+        if (_duration.inMilliseconds > 0) {
+          // 添加更严格的进度值检查和保护
+          double progress = position.inMilliseconds / _duration.inMilliseconds;
+          if (progress.isNaN || progress.isInfinite) {
+            progress = 0.0;
+          }
+          progress = progress.clamp(0.0, 1.0);
+          progressNotifier.value = progress;
+          
+          // 添加日志以便调试
+          if (progress > 1.0) {
+            print('异常进度值: $progress, position: $position, duration: $_duration');
+          }
+        }
+      } catch (e, stack) {
+        print('进度更新错误: $e');
+        print('错误堆栈: $stack');
       }
     });
 
@@ -357,7 +373,14 @@ class AudioProvider with ChangeNotifier {
   }
 
   Future<void> seek(Duration position) async {
-    await _audioService.seek(position);
+    try {
+      final clampedPosition = Duration(
+        milliseconds: position.inMilliseconds.clamp(0, _duration.inMilliseconds)
+      );
+      await _audioService.seek(clampedPosition);
+    } catch (e) {
+      print('Seek failed: $e');
+    }
   }
 
   Future<void> setSpeed(double speed) async {
@@ -564,36 +587,44 @@ class AudioProvider with ChangeNotifier {
   }
 
   void _onPlayComplete() {
-    print('播放完成，当前模式: $_playMode');
-    switch (_playMode) {
-      case PlayMode.sequence:
-        if (_currentIndex < filteredPodcastList.length - 1) {
-          print('顺序播放：播放下一首');
-          playNext();
-        } else {
-          print('顺序播放：已是最后一首');
-        }
-        break;
-      case PlayMode.loop:
-        if (_currentIndex < filteredPodcastList.length - 1) {
-          print('循环播放：播放下一首');
-          playNext();
-        } else {
-          _currentIndex = 0;
-          print('循环播放：已是最后一首');
-          playPodcast(0);
-        }
-        break;
-      case PlayMode.single:
-        print('单循环：播放当前曲目');
-        playPodcast(_currentIndex);
-        break;
-      case PlayMode.random:
-        final random = Random();
-        final nextIndex = random.nextInt(filteredPodcastList.length);
-        print('随机播放：播放下一首');
-        playPodcast(nextIndex);
-        break;
+    try {
+      // 重置进度值
+      progressNotifier.value = 0.0;
+      
+      print('播放完成，当前模式: $_playMode');
+      switch (_playMode) {
+        case PlayMode.sequence:
+          if (_currentIndex < filteredPodcastList.length - 1) {
+            print('顺序播放：播放下一首');
+            playNext();
+          } else {
+            print('顺序播放：已是最后一首');
+          }
+          break;
+        case PlayMode.loop:
+          if (_currentIndex < filteredPodcastList.length - 1) {
+            print('循环播放：播放下一首');
+            playNext();
+          } else {
+            _currentIndex = 0;
+            print('循环播放：已是最后一首');
+            playPodcast(0);
+          }
+          break;
+        case PlayMode.single:
+          print('单循环：播放当前曲目');
+          playPodcast(_currentIndex);
+          break;
+        case PlayMode.random:
+          final random = Random();
+          final nextIndex = random.nextInt(filteredPodcastList.length);
+          print('随机播放：播放下一首');
+          playPodcast(nextIndex);
+          break;
+      }
+    } catch (e, stack) {
+      print('播放完成处理错误: $e');
+      print('错误堆栈: $stack');
     }
   }
 

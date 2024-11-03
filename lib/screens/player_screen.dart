@@ -145,8 +145,9 @@ class PlayerScreen extends StatelessWidget {
                       child: ValueListenableBuilder<double>(
                         valueListenable: audioProvider.progressNotifier,
                         builder: (context, progress, child) {
+                          final safeProgress = progress.clamp(0.0, 1.0);
                           return Slider(
-                            value: progress,
+                            value: safeProgress,
                             onChanged: (value) => audioProvider.seek(
                               Duration(milliseconds: (value * audioProvider.duration.inMilliseconds).round())
                             ),

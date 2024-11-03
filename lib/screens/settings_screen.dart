@@ -59,8 +59,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      suffixIcon: Row(
-                        mainAxisSize: MainAxisSize.min,
+                      suffixIcon: Wrap(
                         children: [
                           IconButton(
                             icon: const Icon(Icons.check_circle_outline),
@@ -139,13 +138,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        '当前地址: ${context.watch<SettingsProvider>().baseUrl}',
-                        style: Theme.of(context).textTheme.bodySmall,
+                      Expanded(
+                        child: Text(
+                          '当前: ${context.watch<SettingsProvider>().baseUrl}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                       TextButton.icon(
                         icon: const Icon(Icons.restore),
-                        label: const Text('重置为默认'),
+                        label: const Text('重置'),
                         onPressed: () async {
                           await context.read<SettingsProvider>().resetToDefault();
                           if (!context.mounted) return;
