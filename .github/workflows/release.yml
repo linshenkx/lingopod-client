@@ -104,21 +104,43 @@ jobs:
           Write-Host "开始打包发布文件..."
           New-Item -ItemType Directory -Force -Path release
           
-          # 打包 APK
-          Write-Host "正在处理 APK..."
-          Copy-Item "build/app/outputs/flutter-apk/app-release.apk" -Destination "release/lingopod-android.apk"
-          
           # 打包 Windows
           Write-Host "正在处理 Windows 文件..."
-          $windowsBuildPath = "build/windows/x64/x64/Release"
+          $windowsBuildPath = "build/windows/x64/runner/Release"
+          
           if (Test-Path $windowsBuildPath) {
+              Write-Host "找到 Windows 构建目录: $windowsBuildPath"
+              Write-Host "目录内容:"
+              Get-ChildItem -Path $windowsBuildPath -Recurse
+              
               $tempDir = "temp_windows"
               New-Item -ItemType Directory -Force -Path $tempDir
-              Copy-Item "$windowsBuildPath/*.exe" -Destination $tempDir -ErrorAction SilentlyContinue
-              Copy-Item "$windowsBuildPath/*.dll" -Destination $tempDir -ErrorAction SilentlyContinue
-              Copy-Item "$windowsBuildPath/data" -Destination "$tempDir/data" -Recurse -ErrorAction SilentlyContinue
+              
+              # 复制所有文件
+              Copy-Item "$windowsBuildPath/*" -Destination $tempDir -Recurse
+              
+              Write-Host "临时目录内容:"
+              Get-ChildItem -Path $tempDir -Recurse
+              
+              # 创建压缩包
               Compress-Archive -Path "$tempDir/*" -DestinationPath "release/lingopod-windows.zip" -Force
+              
+              # 验证压缩包
+              if (Test-Path "release/lingopod-windows.zip") {
+                  Write-Host "✅ Windows 压缩包创建成功"
+                  Write-Host "大小: $((Get-Item 'release/lingopod-windows.zip').length / 1MB) MB"
+              } else {
+                  Write-Host "❌ Windows 压缩包创建失败"
+                  exit 1
+              }
+              
+              # 清理临时目录
               Remove-Item -Path $tempDir -Recurse -Force
+          } else {
+              Write-Host "❌ 未找到 Windows 构建目录: $windowsBuildPath"
+              Write-Host "可用的构建目录:"
+              Get-ChildItem -Path "build/windows" -Recurse
+              exit 1
           }
           
           # 打包 Web
