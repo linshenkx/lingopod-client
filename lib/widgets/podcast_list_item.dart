@@ -16,35 +16,65 @@ class PodcastListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    context.watch<AudioProvider>();
+    final audioProvider = context.watch<AudioProvider>();
+    final isCurrentPlaying = audioProvider.currentIndex == index && 
+                           audioProvider.isPlaying;
 
     return Card(
       elevation: 1,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: InkWell(
         onLongPress: () => _showOptionsDialog(context),
+        onTap: () {
+          // 点击整个卡片也可以播放
+          context.read<AudioProvider>().playPodcast(index);
+        },
         child: ListTile(
           contentPadding: const EdgeInsets.all(16),
           title: Text(
             podcast.title,
-            style: Theme.of(context).textTheme.titleMedium,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: isCurrentPlaying ? 
+                Theme.of(context).colorScheme.primary : null,
+            ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              _formatDateTime(podcast.createdAt),
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 8),
+              Text(
+                _formatDateTime(podcast.createdAt),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              if (isCurrentPlaying) ...[
+                const SizedBox(height: 4),
+                Text(
+                  '正在播放',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ],
           ),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
-                icon: const Icon(Icons.play_arrow),
+                icon: Icon(
+                  isCurrentPlaying ? Icons.pause : Icons.play_arrow,
+                  color: isCurrentPlaying ? 
+                    Theme.of(context).colorScheme.primary : null,
+                ),
                 onPressed: () {
-                  context.read<AudioProvider>().playPodcast(index);
+                  if (isCurrentPlaying) {
+                    context.read<AudioProvider>().togglePlayPause();
+                  } else {
+                    context.read<AudioProvider>().playPodcast(index);
+                  }
                 },
               ),
               PopupMenuButton<String>(
@@ -136,27 +166,29 @@ class PodcastListItem extends StatelessWidget {
   }
 
   String _formatDateTime(DateTime dateTime) {
+    // 转换到本地时区
+    final localDateTime = dateTime.toLocal();
     final now = DateTime.now();
-    final difference = now.difference(dateTime);
+    final difference = now.difference(localDateTime);
 
     if (difference.inDays == 0) {
       // 今天
-      return '今天 ${dateTime.hour.toString().padLeft(2, '0')}:'
-             '${dateTime.minute.toString().padLeft(2, '0')}';
+      return '今天 ${localDateTime.hour.toString().padLeft(2, '0')}:'
+             '${localDateTime.minute.toString().padLeft(2, '0')}';
     } else if (difference.inDays == 1) {
       // 昨天
-      return '昨天 ${dateTime.hour.toString().padLeft(2, '0')}:'
-             '${dateTime.minute.toString().padLeft(2, '0')}';
+      return '昨天 ${localDateTime.hour.toString().padLeft(2, '0')}:'
+             '${localDateTime.minute.toString().padLeft(2, '0')}';
     } else if (difference.inDays < 7) {
       // 一周内
       return '${difference.inDays}天前';
     } else {
       // 超过一周
-      return '${dateTime.year}-'
-             '${dateTime.month.toString().padLeft(2, '0')}-'
-             '${dateTime.day.toString().padLeft(2, '0')} '
-             '${dateTime.hour.toString().padLeft(2, '0')}:'
-             '${dateTime.minute.toString().padLeft(2, '0')}';
+      return '${localDateTime.year}-'
+             '${localDateTime.month.toString().padLeft(2, '0')}-'
+             '${localDateTime.day.toString().padLeft(2, '0')} '
+             '${localDateTime.hour.toString().padLeft(2, '0')}:'
+             '${localDateTime.minute.toString().padLeft(2, '0')}';
     }
   }
 

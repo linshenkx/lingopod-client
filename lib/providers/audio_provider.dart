@@ -75,9 +75,7 @@ class AudioProvider with ChangeNotifier {
   double _progress = 0.0;
   String _currentChineseSubtitle = '';
   String _currentEnglishSubtitle = '';
-  // 添加字幕时间轴列表
   List<SubtitleEntry> _subtitleEntries = [];
-  // 添加 ValueNotifier
   final ValueNotifier<Duration> positionNotifier = ValueNotifier(Duration.zero);
   final ValueNotifier<double> progressNotifier = ValueNotifier(0.0);
   final ValueNotifier<bool> isPlayingNotifier = ValueNotifier(false);
@@ -93,27 +91,27 @@ class AudioProvider with ChangeNotifier {
   PlayMode _playMode = PlayMode.sequence;
   PlayMode get playMode => _playMode;
 
-  Timer? _refreshTimer;
+  bool _isLoading = false;
+  bool get isLoading => _isLoading;
 
   AudioProvider(
     this._audioService, 
     this._apiService,
     this._settingsProvider,
   ) {
-    _setupAudioServiceListeners();
-    _loadPodcastList();
-    startAutoRefresh();
-    
-    // 监听服务器地址变化
-    _settingsProvider.setOnBaseUrlChanged(() {
-      // 停止当前播放
-      stopPlayback();
-      // 清空当前列表
-      _podcastList = [];
-      _filteredPodcastList = [];
-      notifyListeners();
-      // 重新加载播放列表
+    // 使用 addPostFrameCallback 确保在构建完成后进行初始化
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _setupAudioServiceListeners();
       _loadPodcastList();
+      
+      // 监听服务器地址变化
+      _settingsProvider.setOnBaseUrlChanged(() {
+        stopPlayback();
+        _podcastList = [];
+        _filteredPodcastList = [];
+        notifyListeners();
+        _loadPodcastList();
+      });
     });
   }
 
@@ -448,23 +446,47 @@ class AudioProvider with ChangeNotifier {
   }
 
   Future<void> _loadPodcastList() async {
+    if (_isLoading) return; // 防止重复加载
+    
     try {
+      _isLoading = true;
+      // 使用 scheduleMicrotask 延迟第一次通知
+      scheduleMicrotask(() => notifyListeners());
+      
       final podcasts = await _apiService.getPodcastList();
-      _podcastList = podcasts;
-      _filteredPodcastList = _podcastList;
-      notifyListeners();
+      
+      // 使用 scheduleMicrotask 包装所有状态更新
+      scheduleMicrotask(() {
+        _podcastList = podcasts;
+        _filteredPodcastList = podcasts;
+        _isLoading = false;
+        notifyListeners();
+      });
+      
     } catch (e) {
       print('加载播客列表失败: $e');
+      scheduleMicrotask(() {
+        _isLoading = false;
+        notifyListeners();
+      });
     }
   }
 
   Future<void> refreshPodcastList() async {
     try {
+      _isLoading = true;
+      notifyListeners();
+      
       final newList = await _apiService.getPodcastList();
       _podcastList = newList;
-      notifyListeners();
+      _filteredPodcastList = newList;
+      
     } catch (e) {
       print('刷新播客列表失败: $e');
+      // rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
@@ -624,27 +646,12 @@ class AudioProvider with ChangeNotifier {
       }
     } catch (e, stack) {
       print('播放完成处理错误: $e');
-      print('错误堆栈: $stack');
+      print('错误堆: $stack');
     }
-  }
-
-  // 在初始化时启动定时刷新
-  void startAutoRefresh() {
-    // 每30秒刷新一次
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      refreshPodcastList();
-    });
-  }
-
-  // 停止自动刷新
-  void stopAutoRefresh() {
-    _refreshTimer?.cancel();
-    _refreshTimer = null;
   }
 
   @override
   void dispose() {
-    stopAutoRefresh();
     positionNotifier.dispose();
     progressNotifier.dispose();
     isPlayingNotifier.dispose();

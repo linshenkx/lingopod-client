@@ -17,10 +17,8 @@ class _UrlInputFormState extends State<UrlInputForm> {
   @override
   void initState() {
     super.initState();
-    // 设置任务完成回调
-    Future.microtask(() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<TaskProvider>().setOnTaskCompleted(() async {
-        // 刷新播客列表
         await context.read<AudioProvider>().refreshPodcastList();
       });
     });
@@ -35,7 +33,7 @@ class _UrlInputFormState extends State<UrlInputForm> {
           TextFormField(
             controller: _urlController,
             decoration: InputDecoration(
-              hintText: '输入播客URL...',
+              hintText: '请输入要转换为播客的链接',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -55,7 +53,6 @@ class _UrlInputFormState extends State<UrlInputForm> {
           const SizedBox(height: 8),
           Consumer<TaskProvider>(
             builder: (context, taskProvider, child) {
-              // 显示任务状态
               if (taskProvider.taskStatus != null) {
                 return Column(
                   children: [

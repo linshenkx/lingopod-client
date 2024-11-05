@@ -24,8 +24,15 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.1
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
   assets:
     - web/
+    - assets/logo.png  # 替换为您的实际文件名
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo.png"  # 您的logo文件路径

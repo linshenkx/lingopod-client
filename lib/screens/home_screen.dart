@@ -18,16 +18,13 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // 初始加载
-    context.read<AudioProvider>().refreshPodcastList();
-    // 启动自动刷新
-    context.read<AudioProvider>().startAutoRefresh();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AudioProvider>().refreshPodcastList();
+    });
   }
 
   @override
   void dispose() {
-    // 停止自动刷新
-    context.read<AudioProvider>().stopAutoRefresh();
     super.dispose();
   }
 
@@ -88,6 +85,12 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             child: Consumer<AudioProvider>(
               builder: (context, audioProvider, child) {
+                if (audioProvider.isLoading) {
+                  return const Center(
+                    child: CircularProgressIndicator(),
+                  );
+                }
+                
                 if (audioProvider.filteredPodcastList.isEmpty) {
                   return const Center(
                     child: Text('暂无播客'),
@@ -95,7 +98,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 }
                 
                 return RefreshIndicator(
-                  onRefresh: () => audioProvider.refreshPodcastList(),
+                  onRefresh: () async {
+                    await audioProvider.refreshPodcastList();
+                    return Future.value();
+                  },
                   child: ListView.builder(
                     padding: const EdgeInsets.only(bottom: 80), // 为迷你播放器留出空间
                     itemCount: audioProvider.filteredPodcastList.length,
