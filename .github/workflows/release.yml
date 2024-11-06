@@ -17,14 +17,14 @@ jobs:
           Write-Host "开始配置 Android 签名..."
           
           # 创建 keystore 目录
-          New-Item -ItemType Directory -Force -Path android/keystore
+          New-Item -ItemType Directory -Force -Path android/app/keystore
           
           # 将 base64 转换回 jks 文件
-          $env:KEYSTORE_BASE64 | Out-File -FilePath android/keystore/keystore_base64.txt
-          certutil -decode android/keystore/keystore_base64.txt android/keystore/upload-keystore.jks
+          $env:KEYSTORE_BASE64 | Out-File -FilePath android/app/keystore/keystore_base64.txt
+          certutil -decode android/app/keystore/keystore_base64.txt android/app/keystore/upload-keystore.jks
           
           # 验证 keystore 文件
-          if (Test-Path android/keystore/upload-keystore.jks) {
+          if (Test-Path android/app/keystore/upload-keystore.jks) {
               Write-Host "✅ Keystore 文件创建成功"
           } else {
               Write-Host "❌ Keystore 文件创建失败"
@@ -37,10 +37,10 @@ jobs:
           keyPassword=${{ secrets.KEY_PASSWORD }}
           keyAlias=${{ secrets.KEY_ALIAS }}
           storeFile=keystore/upload-keystore.jks
-          "@ | Out-File -FilePath android/key.properties -Encoding UTF8
+          "@ | Out-File -FilePath android/app/key.properties -Encoding UTF8
           
           # 验证 key.properties 文件
-          if (Test-Path android/key.properties) {
+          if (Test-Path android/app/key.properties) {
               Write-Host "✅ key.properties 文件创建成功"
           } else {
               Write-Host "❌ key.properties 文件创建失败"
