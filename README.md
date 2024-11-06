@@ -27,10 +27,11 @@ LingoPod客户端是[LingoPod服务端](https://github.com/linshenkx/lingopod)�
 
 - **框架**: Flutter 3.5.4+
 - **状态管理**: Provider 6.1.1
-- **网络**: Dio 5.4.1
-- **音频播放**: audioplayers 5.2.1
+- **网络**: Dio 5.4.1, HTTP 1.2.0
+- **音频播放**: just_audio 0.9.36, audioplayers 5.2.1
 - **数据持久化**: shared_preferences 2.2.2
-- **缓存管理**: flutter_cache_manager 3.3.1
+- **缓存管理**: flutter_cache_manager 3.3.1, cached_network_image 3.3.1
+- **其他工具**: rxdart 0.27.7, audio_session 0.1.18
 
 ## 🚀 开始使用
 
