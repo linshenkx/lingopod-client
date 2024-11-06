@@ -1,3 +1,8 @@
+## 配置apk签名
+```shell
+keytool -genkey -v -keystore ~/upload-keystore.jks -alias upload -storepass 123456 -keypass 123456 -dname "CN=Test" -validity 36500
+```
+
 ## Flutter 打包 APK 文件
 
 要生成 APK 文件，请按照以下步骤操作：

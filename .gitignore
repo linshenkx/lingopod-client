@@ -1,3 +1,6 @@
+/keystore/
+*/keystore.jks
+
 # Miscellaneous
 *.class
 *.log

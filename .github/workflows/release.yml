@@ -167,14 +167,14 @@ jobs:
             release/lingopod-android.apk
             release/lingopod-windows.zip
             release/lingopod-web.zip
-          name: Release v1.0.0
+          name: Release ${{ github.ref_name }}
           draft: false
           prerelease: false
           body: |
             ## 下载
-            - [Windows 客户端](https://github.com/${{ github.repository }}/releases/download/v1.0.0/lingopod-windows.zip)
-            - [Android APK](https://github.com/${{ github.repository }}/releases/download/v1.0.0/lingopod-android.apk)
-            - [Web 版本](https://github.com/${{ github.repository }}/releases/download/v1.0.0/lingopod-web.zip)
+            - [Windows 客户端](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/lingopod-windows.zip)
+            - [Android APK](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/lingopod-android.apk)
+            - [Web 版本](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/lingopod-web.zip)
             
             ## 部署说明
             ### Web 版本部署
