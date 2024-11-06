@@ -20,6 +20,12 @@ dependencies:
   dio: ^5.4.1
   audioplayers: ^5.2.1
   flutter_cache_manager: ^3.3.1
+  just_audio: ^0.9.36
+  just_audio_web: ^0.4.9
+  just_audio_windows: ^0.2.0
+  just_audio_platform_interface: ^4.2.2
+  audio_session: ^0.1.18
+  rxdart: ^0.27.7
 dev_dependencies:
   flutter_test:
     sdk: flutter

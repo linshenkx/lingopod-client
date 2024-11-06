@@ -11,10 +11,55 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      # 提前设置签名配置
+      - name: Setup Android Keystore
+        run: |
+          Write-Host "开始配置 Android 签名..."
+          
+          # 创建 keystore 目录
+          New-Item -ItemType Directory -Force -Path keystore
+          
+          # 将 base64 转换回 jks 文件
+          $env:KEYSTORE_BASE64 | Out-File -FilePath keystore/keystore_base64.txt
+          certutil -decode keystore/keystore_base64.txt keystore/upload-keystore.jks
+          
+          # 验证 keystore 文件
+          if (Test-Path keystore/upload-keystore.jks) {
+              Write-Host "✅ Keystore 文件创建成功"
+          } else {
+              Write-Host "❌ Keystore 文件创建失败"
+              exit 1
+          }
+          
+          # 创建 key.properties 文件
+          @"
+          storePassword=${{ secrets.STORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=../keystore/upload-keystore.jks
+          "@ | Out-File -FilePath android/key.properties -Encoding UTF8
+          
+          # 验证 key.properties 文件
+          if (Test-Path android/key.properties) {
+              Write-Host "✅ key.properties 文件创建成功"
+              Get-Content android/key.properties | ForEach-Object {
+                  if ($_ -match "password") {
+                      Write-Host "密码已设置 ****"
+                  } else {
+                      Write-Host $_
+                  }
+              }
+          } else {
+              Write-Host "❌ key.properties 文件创建失败"
+              exit 1
+          }
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.4'  # 对应 Dart SDK 3.5.4
+          flutter-version: '3.24.4'
           channel: 'stable'
           cache: true
       
@@ -29,8 +74,8 @@ jobs:
       - name: Setup Java
         uses: actions/setup-java@v3
         with:
-          distribution: 'temurin'  # 使用 Eclipse Temurin JDK
-          java-version: '17'       # 指定 Java 17 版本
+          distribution: 'temurin'
+          java-version: '17'
 
       # 安装 Windows 构建依赖
       - name: Install Windows build dependencies

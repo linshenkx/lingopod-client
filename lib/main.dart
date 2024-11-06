@@ -24,7 +24,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(
           create: (context) => AudioProvider(
-            AudioPlayerService(),
+            AudioService(),
             ApiService(context.read<SettingsProvider>()),
             context.read<SettingsProvider>(),
           ),
@@ -39,12 +39,10 @@ void main() async {
             title: 'LingoPod 译播客',
             theme: ThemeData(
               useMaterial3: true,
-              fontFamily: '.SF Pro Text',
               platform: TargetPlatform.iOS,
             ),
             darkTheme: ThemeData(
               useMaterial3: true,
-              fontFamily: '.SF Pro Text',
               platform: TargetPlatform.iOS,
               brightness: Brightness.dark,
             ),

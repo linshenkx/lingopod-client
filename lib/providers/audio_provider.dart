@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import '../models/podcast.dart';
-import '../services/audio_service.dart';
 import '../services/api_service.dart';
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:convert';
 import 'dart:math';
 import 'dart:async';
 import '../providers/settings_provider.dart';
+import '../services/audio_service.dart';
+import '../services/audio_player_interface.dart' show AudioPlayerState, FileAudioSource, UrlAudioSource;
+import 'dart:io' show Platform;
 
-enum AudioPlayerState { none, loading, playing, paused, error }
 enum SubtitleMode { both, chinese, english }
 enum PlayMode {
   sequence,    // 顺序播放
@@ -55,7 +55,7 @@ class SubtitleCacheManager {
 }
 
 class AudioProvider with ChangeNotifier {
-  final AudioPlayerService _audioService;
+  final AudioService _audioService;
   final ApiService _apiService;
   final SettingsProvider _settingsProvider;
   final _audioCacheManager = AudioCacheManager.instance;
@@ -93,6 +93,9 @@ class AudioProvider with ChangeNotifier {
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
+
+  double _durationRatio = 1.0;  // 时长修正比例
+  Duration _originalDuration = Duration.zero;  // 原始时长（从字幕获取）
 
   AudioProvider(
     this._audioService, 
@@ -166,33 +169,53 @@ class AudioProvider with ChangeNotifier {
       if (duration != null) {
         _duration = duration;
         durationNotifier.value = duration;
+        
+        // 总是打印音频时长
+        print('音频实际时长: ${_formatDuration(duration)}');
+        
+        // 如果有字幕时长，总是计算并打印比例
+        if (_originalDuration.inMilliseconds > 0) {
+          final ratio = _originalDuration.inMilliseconds / duration.inMilliseconds;
+          print('时长比例: $ratio (字幕: ${_formatDuration(_originalDuration)}, 音频: ${_formatDuration(duration)})');
+          
+          // 仅在 Windows 平台时应用比例
+          if (_isWindowsPlatform()) {
+            _durationRatio = ratio;
+          }
+        }
       }
     });
 
     // 播放状态监听
     _audioService.onPlayerStateChanged.listen((state) {
       switch (state) {
-        case PlayerState.playing:
+        case AudioPlayerState.playing:
           _isPlaying = true;
           _playerState = AudioPlayerState.playing;
           isPlayingNotifier.value = true;
           break;
-        case PlayerState.paused:
+        case AudioPlayerState.paused:
           _isPlaying = false;
           _playerState = AudioPlayerState.paused;
           isPlayingNotifier.value = false;
           break;
-        case PlayerState.stopped:
+        case AudioPlayerState.stopped:
           _isPlaying = false;
-          _playerState = AudioPlayerState.none;
+          _playerState = AudioPlayerState.stopped;
+          isPlayingNotifier.value = false;
           break;
-        case PlayerState.completed:
+        case AudioPlayerState.completed:
           _isPlaying = false;
-          _playerState = AudioPlayerState.none;
+          _playerState = AudioPlayerState.completed;
+          isPlayingNotifier.value = false;
           break;
-        default:
+        case AudioPlayerState.none:
+        case AudioPlayerState.loading:
+        case AudioPlayerState.error:
           _isPlaying = false;
-          _playerState = AudioPlayerState.error;
+          _playerState = state;
+          isPlayingNotifier.value = false;
+          break;
       }
     });
 
@@ -207,7 +230,11 @@ class AudioProvider with ChangeNotifier {
   }
 
   void _updateSubtitlesAtPosition(Duration position) {
-    final positionMs = position.inMilliseconds;
+    // 应用时长比例修正
+    final adjustedPosition = Duration(
+      milliseconds: (position.inMilliseconds * _durationRatio).round()
+    );
+    final positionMs = adjustedPosition.inMilliseconds;
     
     for (var entry in _subtitleEntries) {
       final startMs = entry.start.inMilliseconds;
@@ -220,7 +247,7 @@ class AudioProvider with ChangeNotifier {
           _currentEnglishSubtitle = entry.english;
           chineseSubtitleNotifier.value = entry.chinese;
           englishSubtitleNotifier.value = entry.english;
-          print('字幕已更新');
+          print('字幕已更新 (原始位置: ${position.inMilliseconds}ms, 修正位置: ${positionMs}ms)');
         }
         return;
       }
@@ -231,7 +258,6 @@ class AudioProvider with ChangeNotifier {
       _currentEnglishSubtitle = '';
       chineseSubtitleNotifier.value = '';
       englishSubtitleNotifier.value = '';
-      print('字幕已清空');
     }
   }
 
@@ -244,13 +270,14 @@ class AudioProvider with ChangeNotifier {
       final blocks = normalizedContent.split('\n\n');
       print('解析字幕块数量: ${blocks.length}');
       
+      Duration lastEndTime = Duration.zero;
+      
       for (var block in blocks) {
         if (block.trim().isEmpty) continue;
         
         final lines = block.split('\n');
-        if (lines.length < 4) continue;  // 至少需要4：号、时间码中文、英文
+        if (lines.length < 4) continue;
         
-        // 解析时间码
         final timeMatch = RegExp(r'(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})')
             .firstMatch(lines[1]);
         
@@ -258,20 +285,24 @@ class AudioProvider with ChangeNotifier {
           final startTime = _parseTimeCode(timeMatch.group(1)!);
           final endTime = _parseTimeCode(timeMatch.group(2)!);
           
-          // 第三行是中文，第四行是英文
-          final chinese = lines[2].trim();
-          final english = lines[3].trim();
+          // 更新最后的结束时间
+          if (endTime > lastEndTime) {
+            lastEndTime = endTime;
+          }
           
           entries.add(SubtitleEntry(
             start: startTime,
             end: endTime,
-            chinese: chinese,
-            english: english,
+            chinese: lines[2].trim(),
+            english: lines[3].trim(),
           ));
         }
       }
       
-      print('成功解析字幕条目数: ${entries.length}');
+      // 设置原始时长
+      _originalDuration = lastEndTime;
+      print('字幕原始时长: ${_formatDuration(_originalDuration)}');
+      
       return entries;
     } catch (e, stackTrace) {
       print('解析字幕时间轴失败: $e');
@@ -293,7 +324,12 @@ class AudioProvider with ChangeNotifier {
 
   Future<void> playPodcast(int index) async {
     try {
-      // 1. 先清空当前字幕
+      // 1. 先更新迷你播放器状态
+      _miniPlayerVisible = true;
+      miniPlayerVisibleNotifier.value = true;
+      notifyListeners();
+      
+      // 2. 清空当前字幕
       _subtitleEntries = [];
       _currentChineseSubtitle = '';
       _currentEnglishSubtitle = '';
@@ -315,7 +351,6 @@ class AudioProvider with ChangeNotifier {
           print('字幕加载成功，共 ${_subtitleEntries.length} 条字幕');
         } catch (e) {
           print('加载字幕失败: $e');
-          // 字幕加载失败时清空字幕数据
           _subtitleEntries = [];
         }
       }
@@ -324,18 +359,28 @@ class AudioProvider with ChangeNotifier {
       final url = _currentLanguage == 'en' ? podcast.audioUrlEn : podcast.audioUrlCn;
       if (url != null) {
         try {
-          // 4. 先停止当前播放
           await _audioService.stop();
           
           if (kIsWeb) {
-            await _audioService.setSource(UrlSource(url));
+            await _audioService.play(UrlAudioSource(url));
           } else {
             final audioFile = await _audioCacheManager.getSingleFile(url);
-            await _audioService.setSource(DeviceFileSource(audioFile.path));
+            await _audioService.play(FileAudioSource(audioFile.path));
           }
           
-          await Future.delayed(Duration(milliseconds: 300));
-          await _audioService.play();
+          // 4. 等待音频时长更新
+          await Future.delayed(const Duration(milliseconds: 500));
+          
+          // 5. 主动计算并应用比例
+          if (_originalDuration.inMilliseconds > 0 && _duration.inMilliseconds > 0) {
+            final ratio = _originalDuration.inMilliseconds / _duration.inMilliseconds;
+            print('初始化时长比例: $ratio (字幕: ${_formatDuration(_originalDuration)}, 音频: ${_formatDuration(_duration)})');
+            
+            if (_isWindowsPlatform()) {
+              _durationRatio = ratio;
+            }
+          }
+          
           _miniPlayerVisible = true;
           notifyListeners();
         } catch (e, stack) {
@@ -372,6 +417,7 @@ class AudioProvider with ChangeNotifier {
 
   Future<void> seek(Duration position) async {
     try {
+      // 直接使用原始位置，不需要应用比例
       final clampedPosition = Duration(
         milliseconds: position.inMilliseconds.clamp(0, _duration.inMilliseconds)
       );
@@ -662,5 +708,22 @@ class AudioProvider with ChangeNotifier {
     miniPlayerVisibleNotifier.dispose();
     _audioService.dispose();
     super.dispose();
+  }
+
+  // 添加一个辅助函数来检查是否是 Windows 平台
+  bool _isWindowsPlatform() {
+    try {
+      if (kIsWeb) return false;
+      return Platform.isWindows;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    return '$minutes:$seconds';
   }
 } 
