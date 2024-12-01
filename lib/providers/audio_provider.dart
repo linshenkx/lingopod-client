@@ -487,17 +487,18 @@ class AudioProvider with ChangeNotifier {
     }
   }
 
-  Future<void> _loadPodcastList() async {
-    if (_isLoading) return; // 止重复加载
+  Future<void> _loadPodcastList({bool refresh = false}) async {
+    if (_isLoading && !refresh) return;
     
     try {
       _isLoading = true;
-      // 使用 scheduleMicrotask 延迟第一次通知
       scheduleMicrotask(() => notifyListeners());
       
-      final podcasts = await _apiService.getPodcastList();
+      final podcasts = await _apiService.getPodcastList(
+        status: 'completed',
+        limit: 100,
+      );
       
-      // 使用 scheduleMicrotask 包装所有状态更新
       scheduleMicrotask(() {
         _podcastList = podcasts;
         _filteredPodcastList = podcasts;
@@ -514,23 +515,7 @@ class AudioProvider with ChangeNotifier {
     }
   }
 
-  Future<void> refreshPodcastList() async {
-    try {
-      _isLoading = true;
-      notifyListeners();
-      
-      final newList = await _apiService.getPodcastList();
-      _podcastList = newList;
-      _filteredPodcastList = newList;
-      
-    } catch (e) {
-      debugPrint('刷新播客列表失败: $e');
-      // rethrow;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
+  Future<void> refreshPodcastList() => _loadPodcastList(refresh: true);
 
   Future<void> toggleSpeed() async {
     const speeds = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];

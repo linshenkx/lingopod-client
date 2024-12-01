@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 import '../config/api_constants.dart';
 import '../models/podcast.dart';
 import '../providers/settings_provider.dart';
@@ -33,43 +34,43 @@ class ApiService {
     bool? isPublic,
     String? titleKeyword,
     String? urlKeyword,
+    int? startDate,
+    int? endDate,
   }) async {
     try {
       final queryParams = {
-        'limit': limit.toString(),
-        'offset': offset.toString(),
         if (status != null) 'status': status,
-        if (isPublic != null) 'is_public': isPublic.toString(),
+        if (isPublic != null) 'is_public': isPublic,
         if (titleKeyword != null) 'title_keyword': titleKeyword,
         if (urlKeyword != null) 'url_keyword': urlKeyword,
+        if (startDate != null) 'start_date': startDate,
+        if (endDate != null) 'end_date': endDate,
       };
 
-      final uri = Uri.parse('$baseUrl${ApiConstants.tasks}')
-          .replace(queryParameters: queryParams);
+      // 打印查询参数，帮助调试
+      debugPrint('getPodcastList 查询参数: $queryParams');
 
-      final response = await http.get(
-        uri,
-        headers: _headers,
-      ).timeout(timeout);
-      
-      if (response.statusCode == 200) {
-        final String decodedBody = utf8.decode(response.bodyBytes);
-        final Map<String, dynamic> responseData = json.decode(decodedBody);
-        final List<dynamic> data = responseData['items'] as List<dynamic>;
-        
-        return data.map((json) {
-          final taskId = json['taskId'];
-          json['audio_url_cn'] = _getTaskFileUrl(taskId, json['audioUrlCn']);
-          json['audio_url_en'] = _getTaskFileUrl(taskId, json['audioUrlEn']);
-          json['subtitle_url_cn'] = _getTaskFileUrl(taskId, json['subtitleUrlCn']);
-          json['subtitle_url_en'] = _getTaskFileUrl(taskId, json['subtitleUrlEn']);
+      final items = await _fetchItems(
+        endpoint: ApiConstants.tasks,
+        limit: limit,
+        offset: offset,
+        additionalParams: queryParams,
+        processUrls: true,
+      );
+
+      return items.map((json) {
+        try {
           return Podcast.fromJson(json);
-        }).toList();
-      }
-      
-      throw _handleErrorResponse(response);
+        } catch (e, stack) {
+          debugPrint('跳过无效的播客数据: taskId=${json['taskId']}\n错误: $e\n堆栈: $stack');
+          // 在这里，我们不再直接 rethrow，而是记录错误
+          return null;
+        }
+      }).whereType<Podcast>().toList(); // 过滤掉转换失败的项目
     } catch (e) {
-      throw Exception('获取播客列表失败: $e');
+      // 更详细的错误日志
+      debugPrint('getPodcastList 获取数据失败: $e');
+      throw Exception('加载播客列表失败: $e');
     }
   }
 
@@ -289,6 +290,143 @@ class ApiService {
       throw _handleErrorResponse(response);
     } catch (e) {
       throw Exception('获取用户信息失败: $e');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchUserTasks({
+    int limit = 20,
+    int offset = 0,
+    String? status,
+    bool? isPublic,
+    String? titleKeyword,
+    String? urlKeyword,
+    int? startDate,
+    int? endDate,
+  }) async {
+    final queryParams = <String, dynamic>{
+      if (status != null) 'status': status,
+      if (isPublic != null) 'is_public': isPublic,
+      if (titleKeyword != null) 'title_keyword': titleKeyword,
+      if (urlKeyword != null) 'url_keyword': urlKeyword,
+      if (startDate != null) 'start_date': startDate,
+      if (endDate != null) 'end_date': endDate,
+    };
+
+    return _fetchItems(
+      endpoint: ApiConstants.tasks,
+      limit: limit,
+      offset: offset,
+      additionalParams: queryParams,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchItems({
+    required String endpoint,
+    int limit = 20,
+    int offset = 0,
+    Map<String, dynamic>? additionalParams,
+    bool processUrls = false,
+  }) async {
+    try {
+      // 准备查询参数，确保所有值都被安全转换
+      final queryParams = <String, String>{
+        'limit': limit.toString(),
+        'offset': offset.toString(),
+      };
+
+      // 智能添加额外参数，确保安全转换
+      if (additionalParams != null) {
+        additionalParams.forEach((key, value) {
+          if (value != null) {
+            // 安全地将各种类型转换为字符串
+            if (value is bool) {
+              queryParams[key] = value.toString();
+            } else if (value is int) {
+              queryParams[key] = value.toString();
+            } else if (value is String) {
+              queryParams[key] = value;
+            } else {
+              // 对于其他类型，尝试调用 toString()
+              queryParams[key] = value.toString();
+            }
+          }
+        });
+      }
+
+      // 解析基础 URL
+      final uri = Uri.parse('$baseUrl$endpoint').replace(
+        queryParameters: queryParams
+      );
+
+      debugPrint('请求 URL: $uri');
+
+      final response = await http.get(
+        uri, 
+        headers: _headers
+      ).timeout(timeout);
+
+      if (response.statusCode == 200) {
+        final String decodedBody = utf8.decode(response.bodyBytes);
+        
+        final Map<String, dynamic> responseData = json.decode(decodedBody);
+        
+        // 添加类型检查
+        if (responseData['items'] == null) {
+          debugPrint('Warning: No items found in the response');
+          return [];
+        }
+
+        // 确保 items 是一个列表
+        final List<dynamic> items = responseData['items'] is List 
+            ? responseData['items'] 
+            : [responseData['items']];
+        
+        // 处理 URL 和时间戳
+        return items.map((dynamic item) {
+          // 确保 item 是 Map 类型
+          if (item is! Map) {
+            debugPrint('Warning: Non-map item found: $item');
+            return <String, dynamic>{};
+          }
+
+          final json = Map<String, dynamic>.from(item);
+          
+
+          // 可选的 URL 处理
+          if (processUrls && json['taskId'] != null) {
+            final taskId = json['taskId'];
+            json['audioUrlCn'] = _getTaskFileUrl(taskId, json['audioUrlCn']);
+            json['audioUrlEn'] = _getTaskFileUrl(taskId, json['audioUrlEn']);
+            json['subtitleUrlCn'] = _getTaskFileUrl(taskId, json['subtitleUrlCn']);
+            json['subtitleUrlEn'] = _getTaskFileUrl(taskId, json['subtitleUrlEn']);
+          }
+          
+          return json;
+        }).toList();
+      }
+      
+      throw _handleErrorResponse(response);
+    } catch (e) {
+      debugPrint('获取数据失败详细信息: $e');
+      throw Exception('获取数据失败: $e');
+    }
+  }
+
+  Future<void> updateTask(String taskId, {
+    String? title,
+    bool? isPublic,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl${ApiConstants.task(taskId)}'),
+      headers: _headers,
+      body: json.encode({
+        if (title != null) 'title': title,
+        if (isPublic != null) 'is_public': isPublic,
+      }),
+    ).timeout(timeout);
+
+    if (response.statusCode != 200) {
+      throw _handleErrorResponse(response);
     }
   }
 }
