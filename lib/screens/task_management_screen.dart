@@ -248,6 +248,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('任务管理'),
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.add),

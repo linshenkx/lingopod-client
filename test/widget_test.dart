@@ -7,70 +7,85 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lingopod_client/main.dart';
+import 'package:lingopod_client/providers/audio_provider.dart';
+import 'package:lingopod_client/providers/auth_provider.dart';
+import 'package:lingopod_client/providers/navigation_provider.dart';
+import 'package:lingopod_client/providers/settings_provider.dart';
+import 'package:lingopod_client/providers/task_provider.dart';
+import 'package:lingopod_client/providers/theme_provider.dart';
+import 'package:lingopod_client/screens/login_screen.dart';
+import 'package:lingopod_client/services/api_service.dart';
+import 'package:lingopod_client/services/audio_service.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_lingopod_app/providers/settings_provider.dart';
-import 'package:flutter_lingopod_app/providers/theme_provider.dart';
-import 'package:flutter_lingopod_app/providers/audio_provider.dart';
-import 'package:flutter_lingopod_app/providers/task_provider.dart';
-import 'package:flutter_lingopod_app/services/audio_service.dart';
-import 'package:flutter_lingopod_app/services/api_service.dart';
+
 
 void main() {
-  testWidgets('App smoke test', (WidgetTester tester) async {
-    // 创建必要的 providers
-    final settingsProvider = SettingsProvider();
-    await settingsProvider.init();
+  group('App Widget Tests', () {
+    late SettingsProvider settingsProvider;
 
-    // 构建测试用的 widget tree
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider.value(value: settingsProvider),
-          ChangeNotifierProvider(create: (_) => ThemeProvider()),
-          ChangeNotifierProvider(
-            create: (context) => AudioProvider(
-              AudioPlayerService(),
-              ApiService(context.read<SettingsProvider>()),
-              context.read<SettingsProvider>(),
+    setUp(() async {
+      settingsProvider = SettingsProvider();
+      await settingsProvider.init();
+    });
+
+    testWidgets('App starts with login screen when not authenticated', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: settingsProvider),
+            ChangeNotifierProvider(create: (_) => ThemeProvider()),
+            ChangeNotifierProvider(create: (_) => AuthProvider(ApiService(settingsProvider))),
+            ChangeNotifierProvider(create: (_) => NavigationProvider()),
+            ChangeNotifierProvider(
+              create: (context) => AudioProvider(
+                AudioService(),
+                ApiService(context.read<SettingsProvider>()),
+                context.read<SettingsProvider>(),
+              ),
             ),
-          ),
-          ChangeNotifierProvider(
-            create: (context) => TaskProvider(context.read<SettingsProvider>()),
-          ),
-        ],
-        child: MaterialApp(
-          home: Consumer<ThemeProvider>(
-            builder: (context, themeProvider, _) {
-              return MaterialApp(
-                title: 'LingoPod 译播客',
-                theme: ThemeData(
-                  useMaterial3: true,
-                  fontFamily: '.SF Pro Text',
-                  platform: TargetPlatform.iOS,
-                ),
-                darkTheme: ThemeData(
-                  useMaterial3: true,
-                  fontFamily: '.SF Pro Text',
-                  platform: TargetPlatform.iOS,
-                  brightness: Brightness.dark,
-                ),
-                themeMode: themeProvider.themeMode,
-                home: const Scaffold(
-                  body: Center(
-                    child: Text('LingoPod 译播客'),
-                  ),
-                ),
-              );
-            },
-          ),
+            ChangeNotifierProvider(
+              create: (context) => TaskProvider(context.read<SettingsProvider>()),
+            ),
+          ],
+          child: const MyApp(),
         ),
-      ),
-    );
+      );
 
-    // 验证应用标题是否正确显示
-    expect(find.text('LingoPod 译播客'), findsOneWidget);
-    
-    // 等待所有动画完成
-    await tester.pumpAndSettle();
+      // 验证是否显示登录界面
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.text('LingoPod 译播客'), findsOneWidget);
+      
+      // 验证登录界面的基本元素
+      expect(find.byIcon(Icons.person), findsOneWidget); // 用户名图标
+      expect(find.byIcon(Icons.lock), findsOneWidget);  // 密码图标
+      expect(find.text('登录'), findsOneWidget);
+      expect(find.text('还没有账号？立即注册'), findsOneWidget);
+
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('Theme toggle works correctly', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: settingsProvider),
+            ChangeNotifierProvider(create: (_) => ThemeProvider()),
+            ChangeNotifierProvider(create: (_) => AuthProvider(ApiService(settingsProvider))),
+          ],
+          child: const MyApp(),
+        ),
+      );
+
+      // 找到主题切换按钮
+      final themeButton = find.byIcon(Icons.light_mode).first;
+      
+      // 点击切换主题
+      await tester.tap(themeButton);
+      await tester.pumpAndSettle();
+
+      // 验证主题是否切换（通过检查图标变化）
+      expect(find.byIcon(Icons.dark_mode), findsOneWidget);
+    });
   });
 }

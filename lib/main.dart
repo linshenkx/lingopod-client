@@ -6,13 +6,14 @@ import 'services/api_service.dart';
 import 'providers/theme_provider.dart';
 import 'providers/audio_provider.dart';
 import 'providers/task_provider.dart';
-import 'screens/home_screen.dart';
 import 'screens/player_screen.dart';
 import 'providers/settings_provider.dart';
 import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/settings_screen.dart';
+import 'providers/navigation_provider.dart';
+import 'screens/main_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,6 +42,7 @@ void main() async {
         ChangeNotifierProvider(
           create: (context) => TaskProvider(context.read<SettingsProvider>()),
         ),
+        ChangeNotifierProvider(create: (_) => NavigationProvider()),
       ],
       child: const MyApp(),
     ),
@@ -76,12 +78,12 @@ class MyApp extends StatelessWidget {
             Locale('en', 'US'),
           ],
           home: authProvider.isAuthenticated 
-              ? const HomeScreen()
+              ? const MainScreen()
               : const LoginScreen(),
           routes: {
             '/login': (context) => const LoginScreen(),
             '/register': (context) => const RegisterScreen(),
-            '/home': (context) => const HomeScreen(),
+            '/home': (context) => const MainScreen(),
             '/settings': (context) => const SettingsScreen(),
             '/player': (context) => PlayerScreen(
                   onClose: () => Navigator.of(context).pop(),

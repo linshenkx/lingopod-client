@@ -1,20 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:http/http.dart' as http;
 import '../providers/settings_provider.dart';
-import '../providers/audio_provider.dart';
-import '../providers/auth_provider.dart';
-import 'home_screen.dart';
-import 'task_management_screen.dart';
+import '../providers/theme_provider.dart';
+import 'package:http/http.dart' as http;
 
-class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+class AuthSettingsScreen extends StatefulWidget {
+  const AuthSettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  State<AuthSettingsScreen> createState() => _AuthSettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _AuthSettingsScreenState extends State<AuthSettingsScreen> {
   late TextEditingController _baseUrlController;
 
   @override
@@ -31,7 +28,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('设置'),
-        automaticallyImplyLeading: false,
+        // 添加返回按钮
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -107,7 +108,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               
                               try {
                                 await context.read<SettingsProvider>().setBaseUrl(url);
-                                await context.read<AudioProvider>().refreshPodcastList();
                                 
                                 if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -160,60 +160,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         },
                       ),
                     ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '账号设置',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: () async {
-                      final confirmed = await showDialog<bool>(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('确认退出'),
-                          content: const Text('确定要退出登录吗？'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, false),
-                              child: const Text('取消'),
-                            ),
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, true),
-                              style: TextButton.styleFrom(
-                                foregroundColor: Theme.of(context).colorScheme.error,
-                              ),
-                              child: const Text('退出'),
-                            ),
-                          ],
-                        ),
-                      );
-
-                      if (confirmed == true && context.mounted) {
-                        await context.read<AuthProvider>().logout();
-                        if (context.mounted) {
-                          Navigator.of(context).pushReplacementNamed('/login');
-                        }
-                      }
-                    },
-                    icon: const Icon(Icons.logout),
-                    label: const Text('退出登录'),
-                    style: ElevatedButton.styleFrom(
-                      foregroundColor: Theme.of(context).colorScheme.error,
-                    ),
                   ),
                 ],
               ),

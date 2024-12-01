@@ -20,14 +20,19 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AudioProvider>().refreshPodcastList();
-    });
-  }
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final audioProvider = context.read<AudioProvider>();
+      await audioProvider.refreshPodcastList();
 
-  @override
-  void dispose() {
-    super.dispose();
+    if (context.mounted && audioProvider.filteredPodcastList.isNotEmpty) {
+        if (audioProvider.currentPodcast == null) {
+          audioProvider.setCurrentPodcast(
+            audioProvider.filteredPodcastList[0],
+            autoPlay: false
+          );
+        }
+      }
+    });
   }
 
   @override
@@ -36,16 +41,6 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('LingoPod 译播客'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const SettingsScreen(),
-                ),
-              );
-            },
-          ),
           IconButton(
             icon: const Icon(Icons.brightness_6),
             onPressed: () {
@@ -59,78 +54,14 @@ class _HomeScreenState extends State<HomeScreen> {
               context.read<AudioProvider>().refreshPodcastList();
             },
           ),
-          Consumer<TaskProvider>(
-            builder: (context, taskProvider, child) {
-              final hasProcessingTasks = taskProvider.tasks.any(
-                (task) => task.status == 'processing' || task.status == 'pending'
-              );
-              
-              final hasFailedTasks = taskProvider.tasks.any(
-                (task) => task.status == 'failed'
-              );
-
-              return Stack(
-                children: [
-                  IconButton(
-                    icon: hasProcessingTasks
-                      ? const Icon(Icons.sync, color: Colors.blue)
-                      : const Icon(Icons.task_alt),
-                    tooltip: '任务管理',
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const TaskManagementScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  if (hasProcessingTasks)
-                    Positioned(
-                      right: 8,
-                      top: 8,
-                      child: RotationTransition(
-                        turns: AlwaysStoppedAnimation(
-                          DateTime.now().millisecondsSinceEpoch / 1000
-                        ),
-                        child: const Icon(
-                          Icons.sync,
-                          size: 12,
-                          color: Colors.blue,
-                        ),
-                      ),
-                    )
-                  else if (hasFailedTasks)
-                    Positioned(
-                      right: 8,
-                      top: 8,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.error,
-                          size: 12,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
         ],
       ),
       body: Column(
         children: [
-          // URL输入表单
           const Padding(
             padding: EdgeInsets.all(16.0),
             child: UrlInputForm(),
           ),
-          // 搜索框
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: TextFormField(
@@ -152,20 +83,15 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          // 播客列表
           Expanded(
             child: Consumer<AudioProvider>(
               builder: (context, audioProvider, child) {
                 if (audioProvider.isLoading) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
+                  return const Center(child: CircularProgressIndicator());
                 }
                 
                 if (audioProvider.filteredPodcastList.isEmpty) {
-                  return const Center(
-                    child: Text('暂无播客'),
-                  );
+                  return const Center(child: Text('暂无播客'));
                 }
                 
                 return RefreshIndicator(
@@ -189,13 +115,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ],
-      ),
-      bottomNavigationBar: Consumer<AudioProvider>(
-        builder: (context, audioProvider, child) {
-          return audioProvider.currentPodcast != null
-              ? const MiniPlayer()
-              : const SizedBox.shrink();
-        },
       ),
     );
   }

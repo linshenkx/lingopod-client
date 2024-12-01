@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
+import '../screens/auth_settings_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -29,7 +30,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
-              Navigator.pushNamed(context, '/settings');
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const AuthSettingsScreen(),
+                ),
+              );
             },
           ),
           // 主题切换按钮

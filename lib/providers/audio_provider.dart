@@ -230,34 +230,40 @@ class AudioProvider with ChangeNotifier {
   }
 
   void _updateSubtitlesAtPosition(Duration position) {
-    // 应用时长比例修正
-    final adjustedPosition = Duration(
-      milliseconds: (position.inMilliseconds * _durationRatio).round()
-    );
-    final positionMs = adjustedPosition.inMilliseconds;
-    
-    for (var entry in _subtitleEntries) {
-      final startMs = entry.start.inMilliseconds;
-      final endMs = entry.end.inMilliseconds;
-      
-      if (positionMs >= startMs && positionMs <= endMs) {
-        if (_currentChineseSubtitle != entry.chinese || 
-            _currentEnglishSubtitle != entry.english) {
-          _currentChineseSubtitle = entry.chinese;
-          _currentEnglishSubtitle = entry.english;
-          chineseSubtitleNotifier.value = entry.chinese;
-          englishSubtitleNotifier.value = entry.english;
-          debugPrint('字幕已更新 (原始位置: ${position.inMilliseconds}ms, 修正位置: ${positionMs}ms)');
+    try {
+      // 应用时长比例修正
+      final adjustedPosition = Duration(
+        milliseconds: (position.inMilliseconds * _durationRatio).round()
+      );
+      final positionMs = adjustedPosition.inMilliseconds;
+            
+      for (var entry in _subtitleEntries) {
+        final startMs = entry.start.inMilliseconds;
+        final endMs = entry.end.inMilliseconds;
+        
+        if (positionMs >= startMs && positionMs <= endMs) {
+          if (_currentChineseSubtitle != entry.chinese || 
+              _currentEnglishSubtitle != entry.english) {
+            debugPrint('找到匹配字幕 - 中文: ${entry.chinese}, 英文: ${entry.english}');
+            _currentChineseSubtitle = entry.chinese;
+            _currentEnglishSubtitle = entry.english;
+            chineseSubtitleNotifier.value = entry.chinese;
+            englishSubtitleNotifier.value = entry.english;
+          }
+          return;
         }
-        return;
       }
-    }
-    
-    if (_currentChineseSubtitle.isNotEmpty || _currentEnglishSubtitle.isNotEmpty) {
-      _currentChineseSubtitle = '';
-      _currentEnglishSubtitle = '';
-      chineseSubtitleNotifier.value = '';
-      englishSubtitleNotifier.value = '';
+      
+      // 如果没有找到匹配的字幕，清空当前字幕
+      if (_currentChineseSubtitle.isNotEmpty || _currentEnglishSubtitle.isNotEmpty) {
+        _currentChineseSubtitle = '';
+        _currentEnglishSubtitle = '';
+        chineseSubtitleNotifier.value = '';
+        englishSubtitleNotifier.value = '';
+      }
+    } catch (e, stack) {
+      debugPrint('更新字幕出错: $e');
+      debugPrint('错误堆栈: $stack');
     }
   }
 
@@ -322,7 +328,7 @@ class AudioProvider with ChangeNotifier {
     );
   }
 
-  Future<void> playPodcast(int index) async {
+  Future<void> playPodcast(int index, {bool autoPlay = true}) async {
     try {
       // 1. 先更新迷你播放器状态
       _miniPlayerVisible = true;
@@ -340,7 +346,7 @@ class AudioProvider with ChangeNotifier {
       _currentPodcast = _podcastList[index];
       final podcast = _podcastList[index];
       
-      // 2. 确保字幕完全加载后再播放音频
+      // 3. 加载字幕 - 无论是否自动播放都要加载字幕
       final subtitleUrl = _currentLanguage == 'en' ? podcast.subtitleUrlEn : podcast.subtitleUrlCn;
       try {
         final subtitleFile = await _subtitleCacheManager.getSingleFile(subtitleUrl);
@@ -353,7 +359,14 @@ class AudioProvider with ChangeNotifier {
         _subtitleEntries = [];
       }
       
-      // 3. 加载音频
+      // 4. 如果不需要自动播放，这里就返回
+      if (!autoPlay) {
+        _miniPlayerVisible = true;
+        notifyListeners();
+        return;
+      }
+      
+      // 5. 加载并播放音频
       final url = _currentLanguage == 'en' ? podcast.audioUrlEn : podcast.audioUrlCn;
       try {
         await _audioService.stop();
@@ -393,16 +406,34 @@ class AudioProvider with ChangeNotifier {
   }
 
   Future<void> togglePlayPause() async {
-    if (_currentIndex < 0) return;
+    if (_currentIndex < 0 || _currentPodcast == null) return;
     
     try {
+      debugPrint('当前播放状态: $_playerState, 是否播放: $_isPlaying');
+      
       if (_isPlaying) {
+        debugPrint('暂停播放');
         await _audioService.pause();
+        _isPlaying = false;
+        isPlayingNotifier.value = false;
       } else {
-        await _audioService.play();  // 不传 URL，直接继续播放
+        // 如果还没有开始播放，需要先加载音频和字幕
+        if (_playerState == AudioPlayerState.none || _playerState == AudioPlayerState.stopped) {
+          debugPrint('初始化播放');
+          await playPodcast(_currentIndex, autoPlay: true);  // 使用 playPodcast 来确保字幕被加载
+        } else {
+          debugPrint('继续播放');
+          await _audioService.play();
+          _isPlaying = true;
+          isPlayingNotifier.value = true;
+        }
       }
-    } catch (e) {
+      
+      _playerState = _isPlaying ? AudioPlayerState.playing : AudioPlayerState.paused;
+      notifyListeners();
+    } catch (e, stack) {
       debugPrint('播放控制出错: $e');
+      debugPrint('错误堆栈: $stack');
     }
   }
 
@@ -494,24 +525,24 @@ class AudioProvider with ChangeNotifier {
       _isLoading = true;
       scheduleMicrotask(() => notifyListeners());
       
+      debugPrint('开始加载播客列表...');
       final podcasts = await _apiService.getPodcastList(
         status: 'completed',
         limit: 100,
       );
       
-      scheduleMicrotask(() {
-        _podcastList = podcasts;
-        _filteredPodcastList = podcasts;
-        _isLoading = false;
-        notifyListeners();
-      });
+      debugPrint('获取到 ${podcasts.length} 个播客');
       
+      _podcastList = podcasts;
+      _filteredPodcastList = podcasts;
+      _isLoading = false;
+      notifyListeners();
+      
+      debugPrint('播客列表加载完成');
     } catch (e) {
       debugPrint('加载播客列表失败: $e');
-      scheduleMicrotask(() {
-        _isLoading = false;
-        notifyListeners();
-      });
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
@@ -751,5 +782,17 @@ class AudioProvider with ChangeNotifier {
   Future<void> retryTask(String taskId) async {
     await _apiService.retryTask(taskId);
     await refreshPodcastList();  // 重试后刷新列表
+  }
+
+  void setCurrentPodcast(Podcast podcast, {bool autoPlay = true}) {
+    _currentPodcast = podcast;
+    _currentIndex = _podcastList.indexOf(podcast);
+    _miniPlayerVisible = true;
+    miniPlayerVisibleNotifier.value = true;
+    
+    if (autoPlay) {
+      playPodcast(_currentIndex);
+    }
+    notifyListeners();
   }
 } 
