@@ -8,10 +8,14 @@ class TaskProvider with ChangeNotifier {
   String? _taskStatus;
   String? _taskProgress;
   bool _isPolling = false;
+  String? _currentStep;
+  int? _stepProgress;
 
   String? get taskStatus => _taskStatus;
   String? get taskProgress => _taskProgress;
   bool get isProcessing => _isPolling;
+  String? get currentStep => _currentStep;
+  int? get stepProgress => _stepProgress;
 
   TaskProvider(SettingsProvider settingsProvider) 
       : _apiService = ApiService(settingsProvider);
@@ -93,6 +97,8 @@ class TaskProvider with ChangeNotifier {
     _currentTaskId = null;
     _taskStatus = null;
     _taskProgress = null;
+    _currentStep = null;
+    _stepProgress = null;
     notifyListeners();
   }
 
@@ -106,5 +112,36 @@ class TaskProvider with ChangeNotifier {
   Function? _onTaskCompleted;
   void setOnTaskCompleted(Function callback) {
     _onTaskCompleted = callback;
+  }
+
+  Future<void> retryTask() async {
+    if (_currentTaskId == null) return;
+    
+    try {
+      await _apiService.retryTask(_currentTaskId!);
+      // 重置状态
+      _taskStatus = 'processing';
+      _taskProgress = '正在处理...';
+      notifyListeners();
+    } catch (e) {
+      // 处理错误
+    }
+  }
+
+  Future<void> deleteTask() async {
+    if (_currentTaskId == null) return;
+    
+    try {
+      await _apiService.deletePodcast(_currentTaskId!);
+      // 清除状态
+      _taskStatus = null;
+      _taskProgress = null;
+      _currentStep = null;
+      _stepProgress = null;
+      _currentTaskId = null;
+      notifyListeners();
+    } catch (e) {
+      // 处理错误
+    }
   }
 }

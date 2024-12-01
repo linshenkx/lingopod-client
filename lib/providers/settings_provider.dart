@@ -6,7 +6,7 @@ import 'dart:async';
 import '../config/api_constants.dart';
 
 class SettingsProvider extends ChangeNotifier {
-  static const String _defaultBaseUrl = 'http://localhost:28811/api';
+  static const String _defaultBaseUrl = 'http://localhost:28811';
   static const String _baseUrlKey = 'base_url';
   late SharedPreferences _prefs;
   String _baseUrl = _defaultBaseUrl;
@@ -44,7 +44,7 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<(bool, String)> testConnection(String url) async {
     try {
-      final uri = Uri.parse('$url${ApiConstants.getList}');
+      final uri = Uri.parse('$url${ApiConstants.tasks}');
       final response = await http.get(uri).timeout(
         const Duration(seconds: 10),
         onTimeout: () {
@@ -55,10 +55,10 @@ class SettingsProvider extends ChangeNotifier {
       if (response.statusCode == 200) {
         try {
           final data = json.decode(response.body);
-          if (data is List) {
+          if (data is Map && data.containsKey('items')) {
             return (true, '成功获取播客列表');
           }
-          return (false, '服务器返回数据格式不符合预期：应为列表格式');
+          return (false, '服务器返回数据格式不符合预期：应为分页列表格式');
         } catch (e) {
           return (false, '服务器返回的JSON格式无效');
         }

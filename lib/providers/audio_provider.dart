@@ -155,12 +155,12 @@ class AudioProvider with ChangeNotifier {
           
           // 添加日志以便调试
           if (progress > 1.0) {
-            print('异常进度值: $progress, position: $position, duration: $_duration');
+            debugPrint('异常进度值: $progress, position: $position, duration: $_duration');
           }
         }
       } catch (e, stack) {
-        print('进度更新错误: $e');
-        print('错误堆栈: $stack');
+        debugPrint('进度更新错误: $e');
+        debugPrint('错误堆栈: $stack');
       }
     });
 
@@ -171,12 +171,12 @@ class AudioProvider with ChangeNotifier {
         durationNotifier.value = duration;
         
         // 总是打印音频时长
-        print('音频实际时长: ${_formatDuration(duration)}');
+        debugPrint('音频实际时长: ${_formatDuration(duration)}');
         
         // 如果有字幕时长，总是计算并打印比例
         if (_originalDuration.inMilliseconds > 0) {
           final ratio = _originalDuration.inMilliseconds / duration.inMilliseconds;
-          print('时长比例: $ratio (字幕: ${_formatDuration(_originalDuration)}, 音频: ${_formatDuration(duration)})');
+          debugPrint('时长比例: $ratio (字幕: ${_formatDuration(_originalDuration)}, 音频: ${_formatDuration(duration)})');
           
           // 仅在 Windows 平台时应用比例
           if (_isWindowsPlatform()) {
@@ -219,12 +219,12 @@ class AudioProvider with ChangeNotifier {
       }
     });
 
-    // 只在这里处理播放完成事件
+    // 修改播放完成的监听器
     _audioService.onPlayerComplete.listen((_) {
       _isPlaying = false;
       _playerState = AudioPlayerState.none;
       isPlayingNotifier.value = false;
-      _onPlayComplete();
+      onPlaybackCompleted();  // 调用新的播放完成处理方法
       precacheNextEpisode();
     });
   }
@@ -247,7 +247,7 @@ class AudioProvider with ChangeNotifier {
           _currentEnglishSubtitle = entry.english;
           chineseSubtitleNotifier.value = entry.chinese;
           englishSubtitleNotifier.value = entry.english;
-          print('字幕已更新 (原始位置: ${position.inMilliseconds}ms, 修正位置: ${positionMs}ms)');
+          debugPrint('字幕已更新 (原始位置: ${position.inMilliseconds}ms, 修正位置: ${positionMs}ms)');
         }
         return;
       }
@@ -268,7 +268,7 @@ class AudioProvider with ChangeNotifier {
       // 统一换行符
       final normalizedContent = srtContent.replaceAll('\r\n', '\n');
       final blocks = normalizedContent.split('\n\n');
-      print('解析字幕块数量: ${blocks.length}');
+      debugPrint('解析字幕块数量: ${blocks.length}');
       
       Duration lastEndTime = Duration.zero;
       
@@ -301,12 +301,12 @@ class AudioProvider with ChangeNotifier {
       
       // 设置原始时长
       _originalDuration = lastEndTime;
-      print('字幕原始时长: ${_formatDuration(_originalDuration)}');
+      debugPrint('字幕原始时长: ${_formatDuration(_originalDuration)}');
       
       return entries;
     } catch (e, stackTrace) {
-      print('解析字幕时间轴失败: $e');
-      print('错误堆栈: $stackTrace');
+      debugPrint('解析字幕时间轴失败: $e');
+      debugPrint('错误堆栈: $stackTrace');
       return [];
     }
   }
@@ -342,55 +342,51 @@ class AudioProvider with ChangeNotifier {
       
       // 2. 确保字幕完全加载后再播放音频
       final subtitleUrl = _currentLanguage == 'en' ? podcast.subtitleUrlEn : podcast.subtitleUrlCn;
-      if (subtitleUrl != null) {
-        try {
-          final subtitleFile = await _subtitleCacheManager.getSingleFile(subtitleUrl);
-          final bytes = await subtitleFile.readAsBytes();
-          final subtitleContent = utf8.decode(bytes);
-          _subtitleEntries = _parseSrtWithTimecode(subtitleContent);
-          print('字幕加载成功，共 ${_subtitleEntries.length} 条字幕');
-        } catch (e) {
-          print('加载字幕失败: $e');
-          _subtitleEntries = [];
-        }
+      try {
+        final subtitleFile = await _subtitleCacheManager.getSingleFile(subtitleUrl);
+        final bytes = await subtitleFile.readAsBytes();
+        final subtitleContent = utf8.decode(bytes);
+        _subtitleEntries = _parseSrtWithTimecode(subtitleContent);
+        debugPrint('字幕加载成功，共 ${_subtitleEntries.length} 条字幕');
+      } catch (e) {
+        debugPrint('加载字幕失败: $e');
+        _subtitleEntries = [];
       }
       
       // 3. 加载音频
       final url = _currentLanguage == 'en' ? podcast.audioUrlEn : podcast.audioUrlCn;
-      if (url != null) {
-        try {
-          await _audioService.stop();
-          
-          if (kIsWeb) {
-            await _audioService.play(UrlAudioSource(url));
-          } else {
-            final audioFile = await _audioCacheManager.getSingleFile(url);
-            await _audioService.play(FileAudioSource(audioFile.path));
-          }
-          
-          // 4. 等待音频时长更新
-          await Future.delayed(const Duration(milliseconds: 500));
-          
-          // 5. 主动计算并应用比例
-          if (_originalDuration.inMilliseconds > 0 && _duration.inMilliseconds > 0) {
-            final ratio = _originalDuration.inMilliseconds / _duration.inMilliseconds;
-            print('初始化时长比例: $ratio (字幕: ${_formatDuration(_originalDuration)}, 音频: ${_formatDuration(_duration)})');
-            
-            if (_isWindowsPlatform()) {
-              _durationRatio = ratio;
-            }
-          }
-          
-          _miniPlayerVisible = true;
-          notifyListeners();
-        } catch (e, stack) {
-          print('音频加载失败: $e');
-          print('错误堆栈: $stack');
-          rethrow;
+      try {
+        await _audioService.stop();
+        
+        if (kIsWeb) {
+          await _audioService.play(UrlAudioSource(url));
+        } else {
+          final audioFile = await _audioCacheManager.getSingleFile(url);
+          await _audioService.play(FileAudioSource(audioFile.path));
         }
+        
+        // 4. 等待音频时长更新
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        // 5. 主动计算并应用比例
+        if (_originalDuration.inMilliseconds > 0 && _duration.inMilliseconds > 0) {
+          final ratio = _originalDuration.inMilliseconds / _duration.inMilliseconds;
+          debugPrint('初始化时长比例: $ratio (字幕: ${_formatDuration(_originalDuration)}, 音频: ${_formatDuration(_duration)})');
+          
+          if (_isWindowsPlatform()) {
+            _durationRatio = ratio;
+          }
+        }
+        
+        _miniPlayerVisible = true;
+        notifyListeners();
+      } catch (e, stack) {
+        debugPrint('音频加载失败: $e');
+        debugPrint('错误堆栈: $stack');
+        rethrow;
       }
     } catch (e) {
-      print('播放出错: $e');
+      debugPrint('播放出错: $e');
       _playerState = AudioPlayerState.error;
       notifyListeners();
     }
@@ -406,7 +402,7 @@ class AudioProvider with ChangeNotifier {
         await _audioService.play();  // 不传 URL，直接继续播放
       }
     } catch (e) {
-      print('播放控制出错: $e');
+      debugPrint('播放控制出错: $e');
     }
   }
 
@@ -423,7 +419,7 @@ class AudioProvider with ChangeNotifier {
       );
       await _audioService.seek(clampedPosition);
     } catch (e) {
-      print('Seek failed: $e');
+      debugPrint('Seek failed: $e');
     }
   }
 
@@ -487,12 +483,12 @@ class AudioProvider with ChangeNotifier {
     } catch (e) {
       _currentTaskId = null;
       notifyListeners();
-      throw Exception('创建任务失败: $e');
+      throw Exception('创任务败: $e');
     }
   }
 
   Future<void> _loadPodcastList() async {
-    if (_isLoading) return; // 防止重复加载
+    if (_isLoading) return; // 止重复加载
     
     try {
       _isLoading = true;
@@ -510,7 +506,7 @@ class AudioProvider with ChangeNotifier {
       });
       
     } catch (e) {
-      print('加载播客列表失败: $e');
+      debugPrint('加载播客列表失败: $e');
       scheduleMicrotask(() {
         _isLoading = false;
         notifyListeners();
@@ -528,7 +524,7 @@ class AudioProvider with ChangeNotifier {
       _filteredPodcastList = newList;
       
     } catch (e) {
-      print('刷新播客列表失败: $e');
+      debugPrint('刷新播客列表失败: $e');
       // rethrow;
     } finally {
       _isLoading = false;
@@ -591,16 +587,12 @@ class AudioProvider with ChangeNotifier {
       final audioUrl = _currentLanguage == 'en' ? 
           nextPodcast.audioUrlEn : nextPodcast.audioUrlCn;
       
-      if (audioUrl != null) {
-        _audioCacheManager.downloadFile(audioUrl);
-      }
+      _audioCacheManager.downloadFile(audioUrl);
       
       final subtitleUrl = _currentLanguage == 'en' ? 
           nextPodcast.subtitleUrlEn : nextPodcast.subtitleUrlCn;
       
-      if (subtitleUrl != null) {
-        _subtitleCacheManager.downloadFile(subtitleUrl);
-      }
+      _subtitleCacheManager.downloadFile(subtitleUrl);
     }
   }
 
@@ -659,40 +651,49 @@ class AudioProvider with ChangeNotifier {
       // 重置进度值
       progressNotifier.value = 0.0;
       
-      print('播放完成，当前模式: $_playMode');
+      debugPrint('播放完成，当前模式: $_playMode');
       switch (_playMode) {
         case PlayMode.sequence:
           if (_currentIndex < filteredPodcastList.length - 1) {
-            print('顺序播放：播放下一首');
+            debugPrint('顺序播放：播放下一首');
             playNext();
           } else {
-            print('顺序播放：已是最后一首');
+            debugPrint('顺序播放：已是最后一首');
           }
           break;
         case PlayMode.loop:
           if (_currentIndex < filteredPodcastList.length - 1) {
-            print('循环播放：播放下一首');
+            debugPrint('循环播放：播放下一首');
             playNext();
           } else {
             _currentIndex = 0;
-            print('循环播放：已是最后一首');
+            debugPrint('循环播放：已是最后一首');
             playPodcast(0);
           }
           break;
         case PlayMode.single:
-          print('单循环：播放当前曲目');
+          debugPrint('单循环：播放当前曲目');
           playPodcast(_currentIndex);
           break;
         case PlayMode.random:
-          final random = Random();
-          final nextIndex = random.nextInt(filteredPodcastList.length);
-          print('随机播放：播放下一首');
-          playPodcast(nextIndex);
+          if (filteredPodcastList.length <= 1) {
+            // 如果只有一首歌，直接重播
+            playPodcast(currentIndex);
+          } else {
+            // 如果有多首歌，确保选择一个不同的索引
+            final random = Random();
+            int nextIndex = currentIndex;
+            // 直接生成一个不同的索引
+            while (nextIndex == currentIndex) {
+              nextIndex = random.nextInt(filteredPodcastList.length);
+            }
+            playPodcast(nextIndex);
+          }
           break;
       }
     } catch (e, stack) {
-      print('播放完成处理错误: $e');
-      print('错误堆: $stack');
+      debugPrint('播放完成处理错误: $e');
+      debugPrint('错误堆: $stack');
     }
   }
 
@@ -725,5 +726,45 @@ class AudioProvider with ChangeNotifier {
     final minutes = twoDigits(duration.inMinutes.remainder(60));
     final seconds = twoDigits(duration.inSeconds.remainder(60));
     return '$minutes:$seconds';
+  }
+
+  void onPlaybackCompleted() {
+    switch (playMode) {
+      case PlayMode.sequence:
+        // 如果不是最后一首，播放下一首
+        if (currentIndex < filteredPodcastList.length - 1) {
+          playPodcast(currentIndex + 1);
+        }
+        break;
+      
+      case PlayMode.loop:
+        // 如果是最后一首，回到第一首
+        if (currentIndex >= filteredPodcastList.length - 1) {
+          playPodcast(0);
+        } else {
+          playPodcast(currentIndex + 1);
+        }
+        break;
+      
+      case PlayMode.single:
+        // 重新播放当前歌曲
+        playPodcast(currentIndex);
+        break;
+      
+      case PlayMode.random:
+        // 随机选择一首（避免重复选中当前歌曲）
+        final random = Random();
+        int nextIndex;
+        do {
+          nextIndex = random.nextInt(filteredPodcastList.length);
+        } while (nextIndex == currentIndex && filteredPodcastList.length > 1);
+        playPodcast(nextIndex);
+        break;
+    }
+  }
+
+  Future<void> retryTask(String taskId) async {
+    await _apiService.retryTask(taskId);
+    await refreshPodcastList();  // 重试后刷新列表
   }
 } 

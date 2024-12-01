@@ -62,19 +62,68 @@ class _UrlInputFormState extends State<UrlInputForm> {
                         color: _getStatusColor(taskProvider.taskStatus!),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _getStatusIcon(taskProvider.taskStatus!),
-                          const SizedBox(width: 8),
+                          Row(
+                            children: [
+                              _getStatusIcon(taskProvider.taskStatus!),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  taskProvider.taskProgress ?? '',
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (taskProvider.currentStep != null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              '当前步骤: ${taskProvider.currentStep}',
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                            if (taskProvider.stepProgress != null)
+                              LinearProgressIndicator(
+                                value: taskProvider.stepProgress! / 100,
+                                backgroundColor: Colors.white24,
+                                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (taskProvider.taskStatus == 'failed') ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
                           Expanded(
-                            child: Text(
-                              taskProvider.taskProgress ?? '',
-                              style: const TextStyle(color: Colors.white),
+                            child: OutlinedButton.icon(
+                              onPressed: () => taskProvider.retryTask(),
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('重试'),
                             ),
                           ),
                         ],
                       ),
-                    ),
+                    ],
+                    if (taskProvider.taskStatus != 'completed') ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => taskProvider.deleteTask(),
+                              icon: const Icon(Icons.delete),
+                              label: const Text('删除'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.red,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 8),
                   ],
                 );

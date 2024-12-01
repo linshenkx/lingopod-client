@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_constants.dart';
 import '../models/podcast.dart';
 import '../providers/settings_provider.dart';
+import '../models/user.dart';
+import '../services/auth_manager.dart';
 
 class ApiService {
   static const timeout = Duration(seconds: 30);
@@ -12,28 +15,54 @@ class ApiService {
 
   String get baseUrl => _settingsProvider.baseUrl;
 
-  String _getFullUrl(String? path) {
-    if (path == null) return '';
-    if (path.startsWith('http')) return path;
+  String _getTaskFileUrl(String taskId, String? filename) {
+    if (filename == null) return '';
     final uri = Uri.parse(baseUrl);
-    final baseHost = '${uri.scheme}://${uri.host}:${uri.port}';
-    return '$baseHost$path';
+    final baseHost = '${uri.scheme}://${uri.host}:${uri.port}/api/v1/tasks/files';
+    final token = AuthManager().token;
+    if (token != null && token.isNotEmpty) {
+      return '$baseHost/$taskId/$filename?token=$token';
+    }
+    return '$baseHost/$taskId/$filename';
   }
 
-  Future<List<Podcast>> getPodcastList() async {
+  Future<List<Podcast>> getPodcastList({
+    int limit = 10,
+    int offset = 0,
+    String? status,
+    bool? isPublic,
+    String? titleKeyword,
+    String? urlKeyword,
+  }) async {
     try {
+      final queryParams = {
+        'limit': limit.toString(),
+        'offset': offset.toString(),
+        if (status != null) 'status': status,
+        if (isPublic != null) 'is_public': isPublic.toString(),
+        if (titleKeyword != null) 'title_keyword': titleKeyword,
+        if (urlKeyword != null) 'url_keyword': urlKeyword,
+      };
+
+      final uri = Uri.parse('$baseUrl${ApiConstants.tasks}')
+          .replace(queryParameters: queryParams);
+
       final response = await http.get(
-        Uri.parse('$baseUrl${ApiConstants.getList}'),
+        uri,
+        headers: _headers,
       ).timeout(timeout);
       
       if (response.statusCode == 200) {
         final String decodedBody = utf8.decode(response.bodyBytes);
-        final List<dynamic> data = json.decode(decodedBody);
+        final Map<String, dynamic> responseData = json.decode(decodedBody);
+        final List<dynamic> data = responseData['items'] as List<dynamic>;
+        
         return data.map((json) {
-          json['audio_url_cn'] = _getFullUrl(json['audioUrlCn']);
-          json['audio_url_en'] = _getFullUrl(json['audioUrlEn']);
-          json['subtitle_url_cn'] = _getFullUrl(json['subtitleUrlCn']);
-          json['subtitle_url_en'] = _getFullUrl(json['subtitleUrlEn']);
+          final taskId = json['taskId'];
+          json['audio_url_cn'] = _getTaskFileUrl(taskId, json['audioUrlCn']);
+          json['audio_url_en'] = _getTaskFileUrl(taskId, json['audioUrlEn']);
+          json['subtitle_url_cn'] = _getTaskFileUrl(taskId, json['subtitleUrlCn']);
+          json['subtitle_url_en'] = _getTaskFileUrl(taskId, json['subtitleUrlEn']);
           return Podcast.fromJson(json);
         }).toList();
       }
@@ -44,15 +73,18 @@ class ApiService {
     }
   }
 
-  Future<String> createPodcastTask(String url) async {
+  Future<String> createPodcastTask(String url, {bool isPublic = false}) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl${ApiConstants.postTask}'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'url': url}),
+        Uri.parse('$baseUrl${ApiConstants.tasks}'),
+        headers: _headers,
+        body: json.encode({
+          'url': url,
+          'is_public': isPublic
+        }),
       ).timeout(timeout);
       
-      if (response.statusCode == 200) {
+      if (response.statusCode == 201) {
         final String decodedBody = utf8.decode(response.bodyBytes);
         final Map<String, dynamic> data = json.decode(decodedBody);
         final taskId = data['taskId'];
@@ -70,9 +102,10 @@ class ApiService {
 
   Future<Map<String, dynamic>> getTaskStatus(String taskId) async {
     try {
-      final response = await http
-          .get(Uri.parse('$baseUrl${ApiConstants.getTask}?taskId=$taskId'))
-          .timeout(timeout);
+      final response = await http.get(
+        Uri.parse('$baseUrl${ApiConstants.task(taskId)}'),
+        headers: _headers,
+      ).timeout(timeout);
       
       if (response.statusCode == 200) {
         final String decodedBody = utf8.decode(response.bodyBytes);
@@ -133,7 +166,8 @@ class ApiService {
   Future<bool> deletePodcast(String taskId) async {
     try {
       final response = await http.delete(
-        Uri.parse('$baseUrl${ApiConstants.deleteTask}/$taskId'),
+        Uri.parse('$baseUrl${ApiConstants.task(taskId)}'),
+        headers: _headers,
       ).timeout(timeout);
       
       if (response.statusCode == 200) {
@@ -143,6 +177,118 @@ class ApiService {
       throw _handleErrorResponse(response);
     } catch (e) {
       throw Exception('删除播客失败: $e');
+    }
+  }
+
+  Future<void> retryTask(String taskId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl${ApiConstants.taskRetry(taskId)}'),
+        headers: _headers,
+      ).timeout(timeout);
+      
+      if (response.statusCode != 200) {
+        throw _handleErrorResponse(response);
+      }
+    } catch (e) {
+      throw Exception('重试任务失败: $e');
+    }
+  }
+
+  Future<http.Response> getTaskFile(String taskId, String filename) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl${ApiConstants.taskFile(taskId, filename)}'),
+        headers: _headers,
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        return response;
+      }
+      
+      throw _handleErrorResponse(response);
+    } catch (e) {
+      throw Exception('获取任务文件失败: $e');
+    }
+  }
+
+  Map<String, String> get _headers {
+    final headers = {'Content-Type': 'application/json'};
+    final token = AuthManager().token;
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
+  }
+
+  Future<Map<String, dynamic>> login(String username, String password) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl${ApiConstants.login}'),
+        body: {
+          'username': username,
+          'password': password,
+        },
+      ).timeout(timeout);
+      
+      final String decodedBody = utf8.decode(response.bodyBytes);
+      final Map<String, dynamic> data = json.decode(decodedBody);
+      
+      if (response.statusCode == 200) {
+        AuthManager().setToken(data['access_token']);
+        return data;
+      }
+      
+      throw data['detail'] ?? '未知错误';
+    } on TimeoutException {
+      throw '请求超时';
+    } catch (e) {
+      throw '登录失败: $e';
+    }
+  }
+
+  Future<void> register(String username, String password, {String? nickname}) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl${ApiConstants.register}'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'username': username,
+          'password': password,
+          if (nickname != null) 'nickname': nickname,
+        }),
+      ).timeout(timeout);
+      
+      if (response.statusCode == 201) {
+        return;
+      }
+      
+      final String decodedBody = utf8.decode(response.bodyBytes);
+      final Map<String, dynamic> data = json.decode(decodedBody);
+      throw data['detail'] ?? '注册失败';
+    } on TimeoutException {
+      throw '请求超时';
+    } catch (e) {
+      if (e is String) throw e;
+      throw e.toString();
+    }
+  }
+
+  Future<User> getCurrentUser() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl${ApiConstants.me}'),
+        headers: _headers,
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        final String decodedBody = utf8.decode(response.bodyBytes);
+        return User.fromJson(json.decode(decodedBody));
+      }
+      
+      throw _handleErrorResponse(response);
+    } catch (e) {
+      throw Exception('获取用户信息失败: $e');
     }
   }
 }

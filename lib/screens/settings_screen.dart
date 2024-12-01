@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
 import '../providers/settings_provider.dart';
 import '../providers/audio_provider.dart';
+import '../providers/auth_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -69,13 +71,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               if (url.isEmpty) return;
                               
                               try {
-                                final (success, message) = await context
-                                    .read<SettingsProvider>()
-                                    .testConnection(url);
+                                final response = await http.get(Uri.parse('$url/api/v1/users/health'));
                                 
                                 if (!context.mounted) return;
                                 
-                                if (success) {
+                                if (response.statusCode == 200) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
                                       content: Text('连接成功'),
@@ -85,7 +85,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 } else {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('连接失败：$message'),
+                                      content: Text('连接失败：服务器返回 ${response.statusCode}'),
                                       backgroundColor: Colors.red,
                                     ),
                                   );
@@ -163,6 +163,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         },
                       ),
                     ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '账号设置',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('确认退出'),
+                          content: const Text('确定要退出登录吗？'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('取消'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              style: TextButton.styleFrom(
+                                foregroundColor: Theme.of(context).colorScheme.error,
+                              ),
+                              child: const Text('退出'),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (confirmed == true && context.mounted) {
+                        await context.read<AuthProvider>().logout();
+                        if (context.mounted) {
+                          Navigator.of(context).pushReplacementNamed('/login');
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.logout),
+                    label: const Text('退出登录'),
+                    style: ElevatedButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
                   ),
                 ],
               ),
