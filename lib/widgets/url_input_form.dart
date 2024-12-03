@@ -12,6 +12,7 @@ class UrlInputForm extends StatefulWidget {
 class _UrlInputFormState extends State<UrlInputForm> {
   final _formKey = GlobalKey<FormState>();
   final _urlController = TextEditingController();
+  final _urlFocusNode = FocusNode();
   bool _isSubmitting = false;
 
   @override
@@ -22,6 +23,8 @@ class _UrlInputFormState extends State<UrlInputForm> {
         children: [
           TextFormField(
             controller: _urlController,
+            focusNode: _urlFocusNode,
+            autofocus: false,
             decoration: InputDecoration(
               hintText: '请输入要转换为播客的链接',
               border: OutlineInputBorder(
@@ -94,6 +97,7 @@ class _UrlInputFormState extends State<UrlInputForm> {
   @override
   void dispose() {
     _urlController.dispose();
+    _urlFocusNode.dispose();
     super.dispose();
   }
 } 

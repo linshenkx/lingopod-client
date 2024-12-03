@@ -5,7 +5,6 @@ import '../models/task.dart';
 
 class TaskProvider with ChangeNotifier {
   final ApiService _apiService;
-  final SettingsProvider _settingsProvider;
 
   List<Task> _tasks = [];
   List<Task> get tasks => _tasks;
@@ -32,8 +31,7 @@ class TaskProvider with ChangeNotifier {
   String? get error => _error;
 
   TaskProvider(SettingsProvider settingsProvider) 
-      : _apiService = ApiService(settingsProvider),
-        _settingsProvider = settingsProvider;
+      : _apiService = ApiService(settingsProvider);
 
   // 新增获取任务列表的方法
   Future<void> fetchTasks({
@@ -180,11 +178,6 @@ class TaskProvider with ChangeNotifier {
     super.dispose();
   }
 
-  // 添加任务完成回调
-  Function? _onTaskCompleted;
-  void setOnTaskCompleted(Function callback) {
-    _onTaskCompleted = callback;
-  }
 
   Future<void> retryTask(String taskId) async {
     try {

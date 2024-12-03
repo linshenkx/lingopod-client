@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/audio_provider.dart';
 import '../providers/task_provider.dart';
 import '../models/task.dart';
 import 'package:flutter/services.dart';  // 用于 Clipboard
@@ -208,6 +209,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   // 更新进行中的任务状态
   void _updateInProgressTasks() async {
     final taskProvider = context.read<TaskProvider>();
+    final audioProvider = context.read<AudioProvider>();
     final tasks = taskProvider.tasks;
     
     for (final task in tasks) {
@@ -234,6 +236,8 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
           // 如果任务完成或失败，刷新整个列表
           if (updatedTask.status == 'completed' || updatedTask.status == 'failed') {
             taskProvider.fetchTasks();
+            // 同时刷新播放列表
+            await audioProvider.refreshPodcastList();
             break;
           }
         } catch (e) {
@@ -447,14 +451,18 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
               child: const Text('取消'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 final url = _urlController.text.trim();
                 if (url.isNotEmpty) {
-                  context.read<TaskProvider>().submitTask(
+                  await context.read<TaskProvider>().submitTask(
                     url, 
                     isPublic: _isPublic
                   );
-                  Navigator.pop(context);
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    // 创建任务后刷新播放列表
+                    context.read<AudioProvider>().refreshPodcastList();
+                  }
                 }
               },
               child: const Text('创建'),
@@ -481,9 +489,13 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
             child: const Text('取消'),
           ),
           TextButton(
-            onPressed: () {
-              context.read<TaskProvider>().deleteTask(task.id);
-              Navigator.pop(context);
+            onPressed: () async {
+              await context.read<TaskProvider>().deleteTask(task.id);
+              if (context.mounted) {
+                Navigator.pop(context);
+                // 删除任务后刷新播放列表
+                context.read<AudioProvider>().refreshPodcastList();
+              }
             },
             style: TextButton.styleFrom(
               foregroundColor: Theme.of(context).colorScheme.error,

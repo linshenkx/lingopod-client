@@ -6,7 +6,10 @@ import 'dart:async';
 import '../config/api_constants.dart';
 
 class SettingsProvider extends ChangeNotifier {
-  static const String _defaultBaseUrl = 'http://localhost:28811';
+  static const String _defaultBaseUrl = String.fromEnvironment(
+    'DEFAULT_BASE_URL',
+    defaultValue: 'http://localhost:28811',
+  );
   static const String _baseUrlKey = 'base_url';
   late SharedPreferences _prefs;
   String _baseUrl = _defaultBaseUrl;

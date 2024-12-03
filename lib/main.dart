@@ -15,6 +15,9 @@ import 'screens/settings_screen.dart';
 import 'providers/navigation_provider.dart';
 import 'screens/main_screen.dart';
 
+// 添加全局 navigatorKey
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   debugPrint('Starting app...');
@@ -57,6 +60,7 @@ class MyApp extends StatelessWidget {
     return Consumer2<ThemeProvider, AuthProvider>(
       builder: (context, themeProvider, authProvider, child) {
         return MaterialApp(
+          navigatorKey: navigatorKey,  // 添加 navigatorKey
           title: 'LingoPod 译播客',
           theme: ThemeData(
             useMaterial3: true,

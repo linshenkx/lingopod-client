@@ -17,7 +17,7 @@ keytool -genkey -v -keystore ~/upload-keystore.jks -alias upload -storepass 1234
 3. 使用以下命令构建 APK：
 
    ```bash
-   flutter build apk
+   flutter build apk --dart-define=DEFAULT_BASE_URL=https://server.lingopod.top
    ```
 
 4. 构建完成后，APK 文件将位于 `build/app/outputs/flutter-apk/` 目录中。
@@ -27,6 +27,22 @@ keytool -genkey -v -keystore ~/upload-keystore.jks -alias upload -storepass 1234
    ```bash
    flutter install
    ```
+
+## 构建 Web 版本
+```shell
+flutter build web --dart-define=DEFAULT_BASE_URL=https://server.lingopod.top
+
+```
+
+## 发布到vercel
+```shell
+npm install -g vercel
+vercel login
+flutter build web --dart-define=DEFAULT_BASE_URL=https://server.lingopod.top
+cd build/web
+vercel
+
+```
 
 ## 发布新版本
 

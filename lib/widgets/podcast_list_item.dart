@@ -16,99 +16,103 @@ class PodcastListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final audioProvider = context.watch<AudioProvider>();
-    final isCurrentPlaying = audioProvider.currentIndex == index && 
-                           audioProvider.isPlaying;
+    return ValueListenableBuilder<bool>(
+      valueListenable: context.read<AudioProvider>().isPlayingNotifier,
+      builder: (context, isPlaying, _) {
+        final audioProvider = context.watch<AudioProvider>();
+        final isCurrentPlaying = audioProvider.currentIndex == index && isPlaying;
 
-    return Card(
-      elevation: 1,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        title: Text(
-          podcast.title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: isCurrentPlaying ? 
-              Theme.of(context).colorScheme.primary : null,
-          ),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 8),
-            Text(
-              _formatDateTime(podcast.createdAt),
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: Icon(
-                isCurrentPlaying ? Icons.pause : Icons.play_arrow,
+        return Card(
+          elevation: 1,
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: ListTile(
+            contentPadding: const EdgeInsets.all(16),
+            title: Text(
+              podcast.title,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: isCurrentPlaying ? 
                   Theme.of(context).colorScheme.primary : null,
               ),
-              onPressed: () {
-                if (isCurrentPlaying) {
-                  audioProvider.togglePlayPause();
-                } else {
-                  audioProvider.playPodcast(index);
-                }
-              },
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert),
-              onSelected: (value) async {
-                switch (value) {
-                  case 'copy':
-                    await _copyUrl(context);
-                    break;
-                  case 'delete':
-                    await _showDeleteConfirmation(context);
-                    break;
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'copy',
-                  child: Row(
-                    children: [
-                      Icon(Icons.content_copy, size: 20),
-                      SizedBox(width: 8),
-                      Text('复制链接'),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.delete_outline,
-                        size: 20,
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '删除',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    ],
-                  ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 8),
+                Text(
+                  _formatDateTime(podcast.createdAt),
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
             ),
-          ],
-        ),
-        onTap: () => audioProvider.playPodcast(index),
-      ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: Icon(
+                    isCurrentPlaying ? Icons.pause : Icons.play_arrow,
+                    color: isCurrentPlaying ? 
+                      Theme.of(context).colorScheme.primary : null,
+                  ),
+                  onPressed: () {
+                    if (audioProvider.currentIndex == index) {
+                      audioProvider.togglePlayPause();
+                    } else {
+                      audioProvider.playPodcast(index);
+                    }
+                  },
+                ),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (value) async {
+                    switch (value) {
+                      case 'copy':
+                        await _copyUrl(context);
+                        break;
+                      case 'delete':
+                        await _showDeleteConfirmation(context);
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'copy',
+                      child: Row(
+                        children: [
+                          Icon(Icons.content_copy, size: 20),
+                          SizedBox(width: 8),
+                          Text('复制链接'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.delete_outline,
+                            size: 20,
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '删除',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            onTap: () => audioProvider.playPodcast(index),
+          ),
+        );
+      },
     );
   }
 

@@ -116,7 +116,11 @@ class MiniPlayer extends StatelessWidget {
                           isPlaying ? Icons.pause : Icons.play_arrow,
                           size: 32,
                         ),
-                        onPressed: audioProvider.togglePlayPause,
+                        onPressed: () {
+                          if (audioProvider.currentPodcast != null) {
+                            audioProvider.togglePlayPause();
+                          }
+                        },
                         padding: EdgeInsets.zero,
                       );
                     },
@@ -132,13 +136,13 @@ class MiniPlayer extends StatelessWidget {
                     builder: (context, speed, child) {
                       return TextButton(
                         onPressed: audioProvider.toggleSpeed,
-                        child: Text(
-                          '${speed}x',
-                          style: const TextStyle(fontSize: 14),
-                        ),
                         style: TextButton.styleFrom(
                           padding: EdgeInsets.zero,
                           minimumSize: const Size(40, 40),
+                        ),
+                        child: Text(
+                          '${speed}x',
+                          style: const TextStyle(fontSize: 14),
                         ),
                       );
                     },

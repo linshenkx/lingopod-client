@@ -136,6 +136,8 @@ class AudioProvider with ChangeNotifier {
   String get currentEnglishSubtitle => _currentEnglishSubtitle;
 
   void _setupAudioServiceListeners() {
+    AudioPlayerState? lastState;
+    
     // 位置更新监听
     _audioService.onPositionChanged.listen((position) {
       try {
@@ -188,43 +190,44 @@ class AudioProvider with ChangeNotifier {
 
     // 播放状态监听
     _audioService.onPlayerStateChanged.listen((state) {
+      // 如果状态没有变化，不处理
+      if (state == lastState) return;
+      lastState = state;
+      
+      debugPrint('收到播放器状态变化: $state');
+      _playerState = state;
+      
       switch (state) {
         case AudioPlayerState.playing:
           _isPlaying = true;
-          _playerState = AudioPlayerState.playing;
           isPlayingNotifier.value = true;
+          debugPrint('更新为播放状态');
           break;
         case AudioPlayerState.paused:
           _isPlaying = false;
-          _playerState = AudioPlayerState.paused;
           isPlayingNotifier.value = false;
+          debugPrint('更新为暂停状态');
           break;
         case AudioPlayerState.stopped:
-          _isPlaying = false;
-          _playerState = AudioPlayerState.stopped;
-          isPlayingNotifier.value = false;
-          break;
         case AudioPlayerState.completed:
-          _isPlaying = false;
-          _playerState = AudioPlayerState.completed;
-          isPlayingNotifier.value = false;
-          break;
         case AudioPlayerState.none:
         case AudioPlayerState.loading:
         case AudioPlayerState.error:
           _isPlaying = false;
-          _playerState = state;
           isPlayingNotifier.value = false;
+          debugPrint('更新为其他状态: $state');
           break;
       }
+      notifyListeners();
     });
 
-    // 修改播放完成的监听器
+    // 播放完成监听
     _audioService.onPlayerComplete.listen((_) {
       _isPlaying = false;
-      _playerState = AudioPlayerState.none;
+      _playerState = AudioPlayerState.completed;
       isPlayingNotifier.value = false;
-      onPlaybackCompleted();  // 调用新的播放完成处理方法
+      notifyListeners();
+      onPlaybackCompleted();
       precacheNextEpisode();
     });
   }
@@ -327,8 +330,7 @@ class AudioProvider with ChangeNotifier {
       milliseconds: int.parse(seconds[1]),
     );
   }
-
-  Future<void> playPodcast(int index, {bool autoPlay = true}) async {
+    Future<void> playPodcast(int index, {bool autoPlay = true}) async {
     try {
       // 1. 先更新迷你播放器状态
       _miniPlayerVisible = true;
@@ -405,35 +407,147 @@ class AudioProvider with ChangeNotifier {
     }
   }
 
+  Future<void> playPodcast2(int index, {bool autoPlay = true}) async {
+    try {
+      debugPrint('开始播放播客 index: $index, autoPlay: $autoPlay');
+      
+      // 1. 先更新迷你播放器状态
+      _miniPlayerVisible = true;
+      miniPlayerVisibleNotifier.value = true;
+      notifyListeners();
+      
+      // 2. 清空当前字幕
+      _subtitleEntries = [];
+      _currentChineseSubtitle = '';
+      _currentEnglishSubtitle = '';
+      chineseSubtitleNotifier.value = '';
+      englishSubtitleNotifier.value = '';
+      
+      _currentIndex = index;
+      _currentPodcast = _podcastList[index];
+      final podcast = _podcastList[index];
+      
+      // 3. 加载字幕 - 无论是否自动播放都要加载字幕
+      final subtitleUrl = _currentLanguage == 'en' ? podcast.subtitleUrlEn : podcast.subtitleUrlCn;
+      try {
+        final subtitleFile = await _subtitleCacheManager.getSingleFile(subtitleUrl);
+        final bytes = await subtitleFile.readAsBytes();
+        final subtitleContent = utf8.decode(bytes);
+        _subtitleEntries = _parseSrtWithTimecode(subtitleContent);
+        debugPrint('字幕加载成功，共 ${_subtitleEntries.length} 条字幕');
+      } catch (e) {
+        debugPrint('加载字幕失败: $e');
+        _subtitleEntries = [];
+      }
+      
+      // 4. 如果不需要自动播放，这里就返回
+      if (!autoPlay) {
+        _miniPlayerVisible = true;
+        notifyListeners();
+        return;
+      }
+      
+      // 5. 加载并播放音频
+      final url = _currentLanguage == 'en' ? podcast.audioUrlEn : podcast.audioUrlCn;
+      try {
+        debugPrint('准备加载音频: $url');
+        
+        // 先停止当前播放
+        await _audioService.stop();
+        _isPlaying = false;
+        isPlayingNotifier.value = false;
+        _playerState = AudioPlayerState.stopped;
+        notifyListeners();
+        
+        // 设置音频源
+        if (kIsWeb) {
+          debugPrint('Web平台：设置URL音频源');
+          await _audioService.setSource(UrlAudioSource(url));
+        } else {
+          debugPrint('本地平台：设置文件音频源');
+          final audioFile = await _audioCacheManager.getSingleFile(url);
+          debugPrint('音频文件路径: ${audioFile.path}');
+          await _audioService.setSource(FileAudioSource(audioFile.path));
+        }
+        
+        // 开始播放
+        debugPrint('开始播放音频');
+        await _audioService.play();
+        
+        // 6. 等待音频时长更新
+        debugPrint('等待音频时长更新');
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        // 7. 主动计算并应用比例
+        if (_originalDuration.inMilliseconds > 0 && _duration.inMilliseconds > 0) {
+          final ratio = _originalDuration.inMilliseconds / _duration.inMilliseconds;
+          debugPrint('初始化时长比例: $ratio (字幕: ${_formatDuration(_originalDuration)}, 音频: ${_formatDuration(_duration)})');
+          
+          if (_isWindowsPlatform()) {
+            _durationRatio = ratio;
+          }
+        }
+        
+        _miniPlayerVisible = true;
+        notifyListeners();
+        
+        debugPrint('音频加载和播放完成');
+      } catch (e, stack) {
+        debugPrint('音频加载失败: $e');
+        debugPrint('错误堆栈: $stack');
+        _isPlaying = false;
+        isPlayingNotifier.value = false;
+        _playerState = AudioPlayerState.error;
+        notifyListeners();
+        rethrow;
+      }
+    } catch (e) {
+      debugPrint('播放出错: $e');
+      _playerState = AudioPlayerState.error;
+      _isPlaying = false;
+      isPlayingNotifier.value = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> togglePlayPause() async {
     if (_currentIndex < 0 || _currentPodcast == null) return;
     
     try {
-      debugPrint('当前播放状态: $_playerState, 是否播放: $_isPlaying');
+      debugPrint('开始切换播放状态 - 当前状态: $_playerState, 是否播放: $_isPlaying');
       
-      if (_isPlaying) {
-        debugPrint('暂停播放');
-        await _audioService.pause();
-        _isPlaying = false;
-        isPlayingNotifier.value = false;
-      } else {
-        // 如果还没有开始播放，需要先加载音频和字幕
-        if (_playerState == AudioPlayerState.none || _playerState == AudioPlayerState.stopped) {
-          debugPrint('初始化播放');
-          await playPodcast(_currentIndex, autoPlay: true);  // 使用 playPodcast 来确保字幕被加载
-        } else {
-          debugPrint('继续播放');
-          await _audioService.play();
-          _isPlaying = true;
-          isPlayingNotifier.value = true;
-        }
+      // 防止重复操作
+      if (_playerState == AudioPlayerState.loading) {
+        debugPrint('正在加载中，忽略操作');
+        return;
       }
       
-      _playerState = _isPlaying ? AudioPlayerState.playing : AudioPlayerState.paused;
-      notifyListeners();
+      // 使用本地变量保存当前状态，避免状态判断不一致
+      final currentState = _playerState;
+      
+      debugPrint('当前实际状态 - playerState: $currentState');
+      
+      if (currentState == AudioPlayerState.playing) {
+        debugPrint('准备暂停播放');
+        await _audioService.pause();
+      } else if (currentState == AudioPlayerState.paused) {
+        debugPrint('准备继续播放');
+        await _audioService.play();
+      } else {
+        // 如果是 stopped 或其他状态，需要重新加载并播放
+        debugPrint('准备初始化播放');
+        await playPodcast(_currentIndex, autoPlay: true);
+      }
+      
     } catch (e, stack) {
       debugPrint('播放控制出错: $e');
       debugPrint('错误堆栈: $stack');
+      
+      // 发生错误时恢复状态
+      _isPlaying = false;
+      isPlayingNotifier.value = false;
+      _playerState = AudioPlayerState.error;
+      notifyListeners();
     }
   }
 
@@ -546,7 +660,20 @@ class AudioProvider with ChangeNotifier {
     }
   }
 
-  Future<void> refreshPodcastList() => _loadPodcastList(refresh: true);
+  Future<void> refreshPodcastList() async {
+    final currentPodcastId = _currentPodcast?.taskId;
+    await _loadPodcastList(refresh: true);
+    
+    // 刷新后，找到当前播放的播客在新列表中的位置
+    if (currentPodcastId != null) {
+      final newIndex = _podcastList.indexWhere((p) => p.taskId == currentPodcastId);
+      if (newIndex != -1) {
+        _currentIndex = newIndex;
+        _currentPodcast = _podcastList[newIndex];
+        notifyListeners();
+      }
+    }
+  }
 
   Future<void> toggleSpeed() async {
     const speeds = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
@@ -793,6 +920,31 @@ class AudioProvider with ChangeNotifier {
     if (autoPlay) {
       playPodcast(_currentIndex);
     }
+    notifyListeners();
+  }
+
+  // 添加重置状态的方法
+  void reset() {
+    _podcastList = [];
+    _filteredPodcastList = [];
+    _currentIndex = -1;
+    _currentPodcast = null;
+    _playerState = AudioPlayerState.none;
+    _isPlaying = false;
+    _miniPlayerVisible = false;
+    
+    // 重置所有 ValueNotifier
+    positionNotifier.value = Duration.zero;
+    progressNotifier.value = 0.0;
+    isPlayingNotifier.value = false;
+    durationNotifier.value = Duration.zero;
+    chineseSubtitleNotifier.value = '';
+    englishSubtitleNotifier.value = '';
+    miniPlayerVisibleNotifier.value = false;
+    
+    // 停止当前播放
+    _audioService.stop();
+    
     notifyListeners();
   }
 } 

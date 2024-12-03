@@ -4,8 +4,6 @@ import 'package:http/http.dart' as http;
 import '../providers/settings_provider.dart';
 import '../providers/audio_provider.dart';
 import '../providers/auth_provider.dart';
-import 'home_screen.dart';
-import 'task_management_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});

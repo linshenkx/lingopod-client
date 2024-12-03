@@ -3,6 +3,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../models/user.dart';
 import '../services/auth_manager.dart';
+import 'package:provider/provider.dart';
+import '../providers/audio_provider.dart';
+import '../main.dart';  // 导入 main.dart 以使用 navigatorKey
 
 class AuthProvider with ChangeNotifier {
   final ApiService _apiService;
@@ -12,8 +15,25 @@ class AuthProvider with ChangeNotifier {
   static const String _tokenKey = 'auth_token';
   static const String _rememberLoginKey = 'remember_login';
   bool _rememberLogin = false;
+  
+  // 添加一个 BuildContext 字段
+  BuildContext? _context;
 
   AuthProvider(this._apiService);
+
+  // 添加设置 context 的方法
+  void setContext(BuildContext context) {
+    _context = context;
+  }
+
+  // 获取 AudioProvider 的辅助方法
+  void _resetAudioProvider() {
+    if (_context != null) {
+      Provider.of<AudioProvider>(_context!, listen: false).reset();
+    } else if (navigatorKey.currentContext != null) {
+      Provider.of<AudioProvider>(navigatorKey.currentContext!, listen: false).reset();
+    }
+  }
 
   User? get currentUser => _currentUser;
   String? get token => _token;
@@ -59,6 +79,8 @@ class AuthProvider with ChangeNotifier {
       
       AuthManager().setToken(_token);
       _currentUser = await _apiService.getCurrentUser();
+            // 重置音频播放器状态
+      _resetAudioProvider();
       
       notifyListeners();
     } catch (e) {
@@ -105,6 +127,9 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<void> logout() async {
+    // 重置音频播放器状态
+    _resetAudioProvider();
+    
     _token = null;
     _currentUser = null;
     _rememberLogin = false;
