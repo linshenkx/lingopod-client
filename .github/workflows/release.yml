@@ -5,6 +5,9 @@ on:
     tags:
       - "v*.*.*"
 
+env:
+  DEFAULT_BASE_URL: ${{ secrets.DEFAULT_BASE_URL || vars.DEFAULT_BASE_URL || 'https://server.lingopod.top' }}
+
 jobs:
   build:
     runs-on: windows-latest
@@ -80,7 +83,7 @@ jobs:
           Write-Host "开始 Windows 构建..."
           flutter config --enable-windows-desktop
           flutter create --platforms=windows .
-          flutter build windows --release
+          flutter build windows --release --dart-define=DEFAULT_BASE_URL=$env:DEFAULT_BASE_URL
           
           # 验证 Windows 构建
           Write-Host "检查 Windows 构建输出..."
@@ -108,11 +111,11 @@ jobs:
               exit 1
           }
       
-      # 然后构建 Web（因为通常比较快）
+      # 然后构建 Web
       - name: Build Web
         run: |
           Write-Host "开始 Web 构建..."
-          flutter build web --release
+          flutter build web --release --dart-define=DEFAULT_BASE_URL=$env:DEFAULT_BASE_URL
           
           # 验证 Web 构建
           $webPath = "build/web"
@@ -125,11 +128,11 @@ jobs:
               exit 1
           }
       
-      # 最后构建 APK（因为最耗时）
+      # 最后构建 APK
       - name: Build Android APK
         run: |
           Write-Host "开始 APK 构建..."
-          flutter build apk --release
+          flutter build apk --release --dart-define=DEFAULT_BASE_URL=$env:DEFAULT_BASE_URL
           
           # 验证 APK 构建
           $apkPath = "build/app/outputs/flutter-apk/app-release.apk"

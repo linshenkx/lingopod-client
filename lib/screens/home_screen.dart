@@ -46,11 +46,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector( // 添加 GestureDetector
+    return GestureDetector(
       onTap: () {
         // 点击空白处时取消焦点
         FocusScope.of(context).unfocus();
       },
+      behavior: HitTestBehavior.translucent,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('LingoPod 译播客'),
@@ -105,28 +106,45 @@ class _HomeScreenState extends State<HomeScreen> {
                   if (audioProvider.isLoading) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  
-                  if (audioProvider.filteredPodcastList.isEmpty) {
-                    return const Center(child: Text('暂无播客'));
-                  }
-                  
                   return RefreshIndicator(
                     onRefresh: () async {
                       await audioProvider.refreshPodcastList();
                       return Future.value();
                     },
-                    child: ListView.builder(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.only(bottom: 80),
-                      itemCount: audioProvider.filteredPodcastList.length,
-                      itemBuilder: (context, index) {
-                        return PodcastListItem(
-                          podcast: audioProvider.filteredPodcastList[index],
-                          index: index,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        if (audioProvider.filteredPodcastList.isEmpty) {
+                          // 空列表时的处理
+                          return SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            child: Container(
+                              height: constraints.maxHeight,
+                              alignment: Alignment.center,
+                              child: const Text('暂无播客'),
+                            ),
+                          );
+                        }
+                        
+                        // 有播客时的处理
+                        return SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          child: ListView.builder(
+                            physics: const NeverScrollableScrollPhysics(),
+                            shrinkWrap: true,
+                            padding: const EdgeInsets.only(bottom: 80),
+                            itemCount: audioProvider.filteredPodcastList.length,
+                            itemBuilder: (context, index) {
+                              return PodcastListItem(
+                                podcast: audioProvider.filteredPodcastList[index],
+                                index: index,
+                              );
+                            },
+                          ),
                         );
                       },
                     ),
                   );
+
                 },
               ),
             ),

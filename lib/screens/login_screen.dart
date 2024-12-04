@@ -149,7 +149,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                     _passwordController.text,
                                   );
                                   if (!context.mounted) return;
-                                  Navigator.of(context).pushReplacementNamed('/');
+                                  Navigator.of(context).pushNamedAndRemoveUntil(
+                                    '/home',
+                                    (Route<dynamic> route) => false,
+                                  );
                                 } catch (e) {
                                   if (!context.mounted) return;
                                   // 处理错误信息

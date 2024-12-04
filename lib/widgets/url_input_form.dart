@@ -25,6 +25,7 @@ class _UrlInputFormState extends State<UrlInputForm> {
             controller: _urlController,
             focusNode: _urlFocusNode,
             autofocus: false,
+            onTapOutside: (event) => _urlFocusNode.unfocus(),
             decoration: InputDecoration(
               hintText: '请输入要转换为播客的链接',
               border: OutlineInputBorder(

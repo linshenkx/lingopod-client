@@ -1,4 +1,4 @@
-package com.example.flutter_lingopod_app
+package top.lingopod.client
 
 import io.flutter.embedding.android.FlutterActivity
 
