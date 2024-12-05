@@ -72,6 +72,10 @@ class TaskProvider with ChangeNotifier {
     try {
       final taskId = await _apiService.createPodcastTask(url, isPublic: isPublic);
       
+      if (taskId.isEmpty) {
+        throw Exception('无效的任务ID');
+      }
+      
       // 创建临时 Task 对象并添加到列表
       final newTask = Task(
         id: taskId,
@@ -87,7 +91,9 @@ class TaskProvider with ChangeNotifier {
       // 开始轮询任务状态
       _pollTaskStatus(taskId);
     } catch (e) {
-      print('创建任务失败: $e');
+      debugPrint('创建任务失败: $e');
+      // 直接抛出原始错误
+      rethrow;
     }
   }
 

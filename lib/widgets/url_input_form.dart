@@ -59,9 +59,9 @@ class _UrlInputFormState extends State<UrlInputForm> {
                         try {
                           final url = _urlController.text;
                           await context.read<TaskProvider>().submitTask(url);
-                          _urlController.clear();
                           
                           if (mounted) {
+                            _urlController.clear();
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('任务提交成功'),

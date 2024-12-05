@@ -117,24 +117,27 @@ class PodcastListItem extends StatelessWidget {
   }
 
   String _formatDateTime(int timestamp) {
-    // 转换时间戳为DateTime对象
     final localDateTime = DateTime.fromMillisecondsSinceEpoch(timestamp).toLocal();
     final now = DateTime.now();
-    final difference = now.difference(localDateTime);
+    
+    bool isSameDay = localDateTime.year == now.year &&
+        localDateTime.month == now.month &&
+        localDateTime.day == now.day;
+        
+    final yesterday = DateTime(now.year, now.month, now.day - 1);
+    bool isYesterday = localDateTime.year == yesterday.year &&
+        localDateTime.month == yesterday.month &&
+        localDateTime.day == yesterday.day;
 
-    if (difference.inDays == 0) {
-      // 今天
+    if (isSameDay) {
       return '今天 ${localDateTime.hour.toString().padLeft(2, '0')}:'
              '${localDateTime.minute.toString().padLeft(2, '0')}';
-    } else if (difference.inDays == 1) {
-      // 昨天
+    } else if (isYesterday) {
       return '昨天 ${localDateTime.hour.toString().padLeft(2, '0')}:'
              '${localDateTime.minute.toString().padLeft(2, '0')}';
-    } else if (difference.inDays < 7) {
-      // 一周内
-      return '${difference.inDays}天前';
+    } else if (now.difference(localDateTime).inDays < 7) {
+      return '${now.difference(localDateTime).inDays}天前';
     } else {
-      // 超过一周
       return '${localDateTime.year}-'
              '${localDateTime.month.toString().padLeft(2, '0')}-'
              '${localDateTime.day.toString().padLeft(2, '0')} '

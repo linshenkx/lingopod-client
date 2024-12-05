@@ -97,7 +97,7 @@ class ApiService {
       
       throw _handleErrorResponse(response);
     } catch (e) {
-      throw Exception('创建任务失败: $e');
+      rethrow;
     }
   }
 
