@@ -2,13 +2,14 @@ import 'package:flutter/foundation.dart';
 import '../services/api_service.dart';
 import '../providers/settings_provider.dart';
 import '../models/task.dart';
+import '../models/style_params.dart';
 
 class TaskProvider with ChangeNotifier {
   final ApiService _apiService;
 
   List<Task> _tasks = [];
   List<Task> get tasks => _tasks;
-  
+
   // 新增加载状态
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -30,7 +31,7 @@ class TaskProvider with ChangeNotifier {
   String? _error;
   String? get error => _error;
 
-  TaskProvider(SettingsProvider settingsProvider) 
+  TaskProvider(SettingsProvider settingsProvider)
       : _apiService = ApiService(settingsProvider);
 
   // 新增获取任务列表的方法
@@ -55,9 +56,9 @@ class TaskProvider with ChangeNotifier {
         startDate: startDate,
         endDate: endDate,
       );
-      
+
       _tasks = tasksData.map((json) => Task.fromJson(json)).toList();
-      
+
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -68,14 +69,22 @@ class TaskProvider with ChangeNotifier {
   }
 
   // 保留原有的提交任务方法
-  Future<void> submitTask(String url, {bool isPublic = false}) async {
+  Future<void> submitTask(
+    String url, {
+    bool isPublic = false,
+    StyleParams? styleParams,
+  }) async {
     try {
-      final taskId = await _apiService.createPodcastTask(url, isPublic: isPublic);
-      
+      final taskId = await _apiService.createPodcastTask(
+        url,
+        isPublic: isPublic,
+        styleParams: styleParams,
+      );
+
       if (taskId.isEmpty) {
         throw Exception('无效的任务ID');
       }
-      
+
       // 创建临时 Task 对象并添加到列表
       final newTask = Task(
         id: taskId,
@@ -84,6 +93,10 @@ class TaskProvider with ChangeNotifier {
         progress: 'waiting',
         isPublic: isPublic,
         createdAt: DateTime.now().millisecondsSinceEpoch,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+        userId: 0, // 这里暂时用0,因为还没有获取到真实的userId
+        createdBy: 0, // 同上
+        styleParams: styleParams,
       );
       _tasks.insert(0, newTask);
       notifyListeners();
@@ -100,11 +113,11 @@ class TaskProvider with ChangeNotifier {
   Future<void> _pollTaskStatus(String taskId) async {
     try {
       bool shouldContinue = true;
-      
+
       while (shouldContinue) {
         try {
           final taskStatus = await _apiService.getTaskStatus(taskId);
-          
+
           switch (taskStatus['status']) {
             case 'processing':
               // 更新进度和当前步骤
@@ -113,12 +126,15 @@ class TaskProvider with ChangeNotifier {
                 _tasks[index] = _tasks[index].copyWith(
                   progress: taskStatus['progress']?.toString() ?? 'processing',
                   currentStep: taskStatus['current_step'],
+                  currentStepIndex: taskStatus['current_step_index'],
+                  totalSteps: taskStatus['total_steps'],
+                  progressMessage: taskStatus['progress_message'],
                 );
                 notifyListeners();
               }
               await Future.delayed(const Duration(seconds: 2));
               break;
-            
+
             case 'completed':
               final index = _tasks.indexWhere((t) => t.id == taskId);
               if (index != -1) {
@@ -126,25 +142,29 @@ class TaskProvider with ChangeNotifier {
                   status: 'completed',
                   progress: 'completed',
                   currentStep: '处理完成',
+                  progressMessage: taskStatus['progress_message'],
                 );
                 notifyListeners();
               }
               shouldContinue = false;
               break;
-            
+
             case 'failed':
               final index = _tasks.indexWhere((t) => t.id == taskId);
               if (index != -1) {
                 _tasks[index] = _tasks[index].copyWith(
                   status: 'failed',
                   progress: 'failed',
-                  currentStep: taskStatus['errorMessage'] ?? '处理失败',
+                  currentStep: '处理失败',
+                  errorMessage: taskStatus['progress_message'] ??
+                      taskStatus['error'] ??
+                      '未知错误',
                 );
                 notifyListeners();
               }
               shouldContinue = false;
               break;
-            
+
             default:
               shouldContinue = false;
               break;
@@ -156,7 +176,8 @@ class TaskProvider with ChangeNotifier {
             _tasks[index] = _tasks[index].copyWith(
               status: 'failed',
               progress: 'failed',
-              currentStep: '网络错误: ${e.toString()}',
+              currentStep: '处理失败',
+              errorMessage: '网络错误: ${e.toString()}',
             );
             notifyListeners();
           }
@@ -164,10 +185,9 @@ class TaskProvider with ChangeNotifier {
         }
       }
     } catch (e) {
-      print('轮询任务状态失败: $e');
+      debugPrint('轮询任务状态失败: $e');
     }
   }
-
 
   void _resetStatus() {
     _currentTaskId = null;
@@ -184,11 +204,10 @@ class TaskProvider with ChangeNotifier {
     super.dispose();
   }
 
-
   Future<void> retryTask(String taskId) async {
     try {
       await _apiService.retryTask(taskId);
-      
+
       // 更新任务状态为处理中
       final index = _tasks.indexWhere((t) => t.id == taskId);
       if (index != -1) {
@@ -198,7 +217,7 @@ class TaskProvider with ChangeNotifier {
           currentStep: null,
         );
         notifyListeners();
-        
+
         // 重新开始轮询
         _pollTaskStatus(taskId);
       }
@@ -210,7 +229,7 @@ class TaskProvider with ChangeNotifier {
   Future<void> deleteTask(String taskId) async {
     try {
       await _apiService.deletePodcast(taskId);
-      
+
       // 从列表中移除任务
       _tasks.removeWhere((t) => t.id == taskId);
       notifyListeners();
@@ -219,7 +238,8 @@ class TaskProvider with ChangeNotifier {
     }
   }
 
-  Future<void> updateTask(String taskId, {
+  Future<void> updateTask(
+    String taskId, {
     String? title,
     bool? isPublic,
   }) async {

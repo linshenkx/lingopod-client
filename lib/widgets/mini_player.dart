@@ -16,9 +16,10 @@ class MiniPlayer extends StatelessWidget {
   Widget build(BuildContext context) {
     final audioProvider = Provider.of<AudioProvider>(context);
     final currentPodcast = audioProvider.currentPodcast;
-    final bool hasNext = audioProvider.currentIndex < audioProvider.podcastList.length - 1;
+    final bool hasNext =
+        audioProvider.currentIndex < audioProvider.podcastList.length - 1;
     final bool hasPrevious = audioProvider.currentIndex > 0;
-    
+
     return Container(
       height: 80,
       decoration: BoxDecoration(
@@ -48,9 +49,10 @@ class MiniPlayer extends StatelessWidget {
                   final clampedProgress = progress.clamp(0.0, 1.0);
                   return Slider(
                     value: clampedProgress,
-                    onChanged: (value) => audioProvider.seek(
-                      Duration(milliseconds: (value * audioProvider.duration.inMilliseconds).round())
-                    ),
+                    onChanged: (value) => audioProvider.seek(Duration(
+                        milliseconds:
+                            (value * audioProvider.duration.inMilliseconds)
+                                .round())),
                   );
                 },
               ),
@@ -153,6 +155,12 @@ class MiniPlayer extends StatelessWidget {
                     padding: EdgeInsets.zero,
                   ),
                   IconButton(
+                    icon: const Icon(Icons.school),
+                    onPressed: audioProvider.toggleDifficulty,
+                    padding: EdgeInsets.zero,
+                    tooltip: audioProvider.difficultyText,
+                  ),
+                  IconButton(
                     icon: const Icon(Icons.expand_less),
                     onPressed: () => Navigator.pushNamed(context, '/player'),
                     padding: EdgeInsets.zero,
@@ -165,4 +173,4 @@ class MiniPlayer extends StatelessWidget {
       ),
     );
   }
-} 
+}

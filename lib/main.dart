@@ -14,6 +14,7 @@ import 'screens/register_screen.dart';
 import 'screens/settings_screen.dart';
 import 'providers/navigation_provider.dart';
 import 'screens/main_screen.dart';
+import 'config/style_config.dart';
 
 // 添加全局 navigatorKey
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -24,7 +25,7 @@ void main() async {
 
   final settingsProvider = SettingsProvider();
   await settingsProvider.init();
-  
+
   final apiService = ApiService(settingsProvider);
   final authProvider = AuthProvider(apiService);
   await authProvider.init();
@@ -60,17 +61,10 @@ class MyApp extends StatelessWidget {
     return Consumer2<ThemeProvider, AuthProvider>(
       builder: (context, themeProvider, authProvider, child) {
         return MaterialApp(
-          navigatorKey: navigatorKey,  // 添加 navigatorKey
+          navigatorKey: navigatorKey,
           title: 'LingoPod 译播客',
-          theme: ThemeData(
-            useMaterial3: true,
-            platform: TargetPlatform.iOS,
-          ),
-          darkTheme: ThemeData(
-            useMaterial3: true,
-            platform: TargetPlatform.iOS,
-            brightness: Brightness.dark,
-          ),
+          theme: StyleConfig.getLightTheme(),
+          darkTheme: StyleConfig.getDarkTheme(),
           themeMode: themeProvider.themeMode,
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
@@ -81,7 +75,22 @@ class MyApp extends StatelessWidget {
             Locale('zh', 'CN'),
             Locale('en', 'US'),
           ],
-          home: authProvider.isAuthenticated 
+          builder: (context, child) {
+            // 添加全局响应式布局支持
+            return MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaleFactor: 1.0,
+              ),
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context).copyWith(
+                  physics: const BouncingScrollPhysics(),
+                  scrollbars: true,
+                ),
+                child: child!,
+              ),
+            );
+          },
+          home: authProvider.isAuthenticated
               ? const MainScreen()
               : const LoginScreen(),
           routes: {
