@@ -80,7 +80,21 @@ vercel
 
 4. **GitHub Release**
 
-   推送标签后，GitHub Actions 将自动触发构建和发布流程。你可以在 GitHub Releases 页面查看新版本。
+   推送标签后，GitHub Actions 将自动触发构建和发布流程。
+
+   - **发布正式版本**
+     按照上述步骤，使用格式 `vX.Y.Z` 创建标签，如 `v1.0.0`
+
+   - **发布 Beta 版本**
+     1. 创建 beta 版本标签，使用格式 `vX.Y.Z-beta.N`：
+     ```bash
+     git tag v1.0.0-beta.1
+     ```
+     2. 推送 beta 标签：
+     ```bash
+     git push origin v1.0.0-beta.1
+     ```
+     3. 在 GitHub Releases 页面，该 beta 版本会被自动标记为 "Pre-release"
 
 5. **撤销发布**
 

@@ -337,10 +337,10 @@ class _TaskManagementScreenState extends State<TaskManagementScreen>
   void _updateInProgressTasks() async {
     final taskProvider = context.read<TaskProvider>();
     final audioProvider = context.read<AudioProvider>();
-    final tasks = taskProvider.tasks;
     bool needRefreshAll = false;
 
-    for (final task in tasks) {
+    // 直接使用 TaskProvider 中的任务列表
+    for (final task in taskProvider.tasks) {
       // 只更新处理中和等待中的任务状态
       if (task.status == 'processing' || task.status == 'pending') {
         try {
@@ -351,13 +351,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen>
               updatedTask.currentStep != task.currentStep ||
               updatedTask.currentStepIndex != task.currentStepIndex ||
               updatedTask.progressMessage != task.progressMessage) {
-            // 找到任务在列表中的位置
-            final index = tasks.indexWhere((t) => t.id == task.id);
-            if (index != -1) {
-              setState(() {
-                tasks[index] = updatedTask;
-              });
-            }
+            taskProvider.updateTaskLocally(updatedTask);
           }
 
           // 如果任务完成或失败，标记需要刷新
@@ -367,7 +361,12 @@ class _TaskManagementScreenState extends State<TaskManagementScreen>
           }
         } catch (e) {
           debugPrint('Failed to update task ${task.id}: $e');
-          // 获取单个任务失败时继续处理其他任务
+          // 网络错误时，保持任务状态不变，确保下次继续尝试更新
+          if (task.status == 'processing' || task.status == 'pending') {
+            taskProvider.updateTaskLocally(task.copyWith(
+              progressMessage: '正在重新连接...',
+            ));
+          }
           continue;
         }
       }

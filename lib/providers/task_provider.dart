@@ -259,4 +259,13 @@ class TaskProvider with ChangeNotifier {
       throw Exception('获取任务详情失败');
     }
   }
+
+  // 在本地更新任务状态
+  void updateTaskLocally(Task updatedTask) {
+    final index = _tasks.indexWhere((t) => t.id == updatedTask.id);
+    if (index != -1) {
+      _tasks[index] = updatedTask;
+      notifyListeners();
+    }
+  }
 }
