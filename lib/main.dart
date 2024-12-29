@@ -6,6 +6,7 @@ import 'services/api_service.dart';
 import 'providers/theme_provider.dart';
 import 'providers/audio_provider.dart';
 import 'providers/task_provider.dart';
+import 'providers/rss_provider.dart';
 import 'screens/player_screen.dart';
 import 'providers/settings_provider.dart';
 import 'providers/auth_provider.dart';
@@ -14,7 +15,10 @@ import 'screens/register_screen.dart';
 import 'screens/settings_screen.dart';
 import 'providers/navigation_provider.dart';
 import 'screens/main_screen.dart';
+import 'screens/rss_entries_screen.dart';
 import 'config/style_config.dart';
+import 'models/rss_feed.dart';
+import 'screens/rss_entry_detail_screen.dart';
 
 // 添加全局 navigatorKey
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -47,6 +51,9 @@ void main() async {
           create: (context) => TaskProvider(context.read<SettingsProvider>()),
         ),
         ChangeNotifierProvider(create: (_) => NavigationProvider()),
+        ChangeNotifierProvider(
+          create: (_) => RssProvider(apiService),
+        ),
       ],
       child: const MyApp(),
     ),
@@ -101,6 +108,21 @@ class MyApp extends StatelessWidget {
             '/player': (context) => PlayerScreen(
                   onClose: () => Navigator.of(context).pop(),
                 ),
+          },
+          onGenerateRoute: (settings) {
+            if (settings.name == '/rss_entries') {
+              final feed = settings.arguments as RssFeed;
+              return MaterialPageRoute(
+                builder: (context) => RssEntriesScreen(feed: feed),
+              );
+            }
+            if (settings.name == '/rss_entry_detail') {
+              final entry = settings.arguments as Map<String, dynamic>;
+              return MaterialPageRoute(
+                builder: (context) => RssEntryDetailScreen(entry: entry),
+              );
+            }
+            return null;
           },
         );
       },

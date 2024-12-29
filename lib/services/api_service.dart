@@ -8,6 +8,7 @@ import '../providers/settings_provider.dart';
 import '../models/user.dart';
 import '../services/auth_manager.dart';
 import '../models/style_params.dart';
+import '../models/rss_feed.dart';
 
 class ApiService {
   static const timeout = Duration(seconds: 30);
@@ -431,5 +432,123 @@ class ApiService {
     if (response.statusCode != 200) {
       throw _handleErrorResponse(response);
     }
+  }
+
+  // RSS Feed APIs
+  Future<RssFeed> createRssFeed(String url,
+      {int? initialEntriesCount, int? updateEntriesCount}) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl${ApiConstants.rssFeeds}'),
+          headers: _headers,
+          body: json.encode({
+            'url': url,
+            if (initialEntriesCount != null)
+              'initial_entries_count': initialEntriesCount,
+            if (updateEntriesCount != null)
+              'update_entries_count': updateEntriesCount,
+          }),
+        )
+        .timeout(timeout);
+
+    if (response.statusCode == 201) {
+      final String decodedBody = utf8.decode(response.bodyBytes);
+      return RssFeed.fromJson(json.decode(decodedBody));
+    }
+    throw _handleErrorResponse(response);
+  }
+
+  Future<List<RssFeed>> getRssFeeds() async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl${ApiConstants.rssFeeds}'),
+          headers: _headers,
+        )
+        .timeout(timeout);
+
+    if (response.statusCode == 200) {
+      final String decodedBody = utf8.decode(response.bodyBytes);
+      final List<dynamic> data = json.decode(decodedBody);
+      return data.map((json) => RssFeed.fromJson(json)).toList();
+    }
+    throw _handleErrorResponse(response);
+  }
+
+  Future<RssFeed> getRssFeed(int feedId) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl${ApiConstants.rssFeed(feedId)}'),
+          headers: _headers,
+        )
+        .timeout(timeout);
+
+    if (response.statusCode == 200) {
+      final String decodedBody = utf8.decode(response.bodyBytes);
+      return RssFeed.fromJson(json.decode(decodedBody));
+    }
+    throw _handleErrorResponse(response);
+  }
+
+  Future<RssFeed> updateRssFeed(int feedId,
+      {int? initialEntriesCount, int? updateEntriesCount}) async {
+    final response = await http
+        .put(
+          Uri.parse('$baseUrl${ApiConstants.rssFeed(feedId)}'),
+          headers: _headers,
+          body: json.encode({
+            if (initialEntriesCount != null)
+              'initial_entries_count': initialEntriesCount,
+            if (updateEntriesCount != null)
+              'update_entries_count': updateEntriesCount,
+          }),
+        )
+        .timeout(timeout);
+
+    if (response.statusCode == 200) {
+      final String decodedBody = utf8.decode(response.bodyBytes);
+      return RssFeed.fromJson(json.decode(decodedBody));
+    }
+    throw _handleErrorResponse(response);
+  }
+
+  Future<void> deleteRssFeed(int feedId) async {
+    final response = await http
+        .delete(
+          Uri.parse('$baseUrl${ApiConstants.rssFeed(feedId)}'),
+          headers: _headers,
+        )
+        .timeout(timeout);
+
+    if (response.statusCode != 204) {
+      throw _handleErrorResponse(response);
+    }
+  }
+
+  Future<void> fetchRssFeed(int feedId) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl${ApiConstants.rssFeedFetch(feedId)}'),
+          headers: _headers,
+        )
+        .timeout(timeout);
+
+    if (response.statusCode != 200) {
+      throw _handleErrorResponse(response);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getRssFeedEntries(int feedId) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl${ApiConstants.rssFeedEntries(feedId)}'),
+          headers: _headers,
+        )
+        .timeout(timeout);
+
+    if (response.statusCode == 200) {
+      final String decodedBody = utf8.decode(response.bodyBytes);
+      return List<Map<String, dynamic>>.from(json.decode(decodedBody));
+    }
+    throw _handleErrorResponse(response);
   }
 }
