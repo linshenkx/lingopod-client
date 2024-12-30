@@ -12,8 +12,8 @@ class AddRssFeedDialog extends StatefulWidget {
 class _AddRssFeedDialogState extends State<AddRssFeedDialog> {
   final _formKey = GlobalKey<FormState>();
   final _urlController = TextEditingController();
-  final _initialEntriesController = TextEditingController(text: '10');
-  final _updateEntriesController = TextEditingController(text: '10');
+  final _initialEntriesController = TextEditingController(text: '1');
+  final _updateEntriesController = TextEditingController(text: '1');
   bool _isLoading = false;
 
   @override
@@ -59,8 +59,8 @@ class _AddRssFeedDialogState extends State<AddRssFeedDialog> {
                     child: TextFormField(
                       controller: _initialEntriesController,
                       decoration: const InputDecoration(
-                        labelText: '初始文章数',
-                        hintText: '首次抓取文章数',
+                        labelText: '首次抓取文章数',
+                        hintText: '首次抓取的文章数量',
                       ),
                       keyboardType: TextInputType.number,
                       validator: (value) {
@@ -80,8 +80,8 @@ class _AddRssFeedDialogState extends State<AddRssFeedDialog> {
                     child: TextFormField(
                       controller: _updateEntriesController,
                       decoration: const InputDecoration(
-                        labelText: '更新文章数',
-                        hintText: '每次更新文章数',
+                        labelText: '每次更新文章数',
+                        hintText: '每次更新的最大文章数量',
                       ),
                       keyboardType: TextInputType.number,
                       validator: (value) {

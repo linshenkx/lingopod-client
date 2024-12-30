@@ -173,6 +173,10 @@ class ApiService {
 
   Exception _handleErrorResponse(http.Response response) {
     try {
+      // 如果状态码是200，不应该被视为错误
+      if (response.statusCode == 200) {
+        return Exception('Success');
+      }
       final String decodedBody = utf8.decode(response.bodyBytes);
       final Map<String, dynamic> error = json.decode(decodedBody);
       return Exception(error['message'] ?? '未知错误');
@@ -445,7 +449,7 @@ class ApiService {
           )
           .timeout(timeout);
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 200) {
         final String decodedBody = utf8.decode(response.bodyBytes);
         final Map<String, dynamic> data = json.decode(decodedBody);
         return RssFeed.fromJson(data);
@@ -453,39 +457,50 @@ class ApiService {
 
       throw _handleErrorResponse(response);
     } catch (e) {
-      rethrow;
+      throw Exception('创建RSS订阅失败: $e');
     }
   }
 
   Future<List<RssFeed>> getRssFeeds() async {
-    final response = await http
-        .get(
-          Uri.parse('$baseUrl${ApiConstants.rssFeeds}'),
-          headers: _headers,
-        )
-        .timeout(timeout);
+    try {
+      final response = await http
+          .get(
+            Uri.parse('$baseUrl${ApiConstants.rssFeeds}'),
+            headers: _headers,
+          )
+          .timeout(timeout);
 
-    if (response.statusCode == 200) {
-      final String decodedBody = utf8.decode(response.bodyBytes);
-      final List<dynamic> data = json.decode(decodedBody);
-      return data.map((json) => RssFeed.fromJson(json)).toList();
+      if (response.statusCode == 200) {
+        final String decodedBody = utf8.decode(response.bodyBytes);
+        final List<dynamic> data = json.decode(decodedBody);
+        return data.map((json) => RssFeed.fromJson(json)).toList();
+      }
+
+      throw _handleErrorResponse(response);
+    } catch (e) {
+      throw Exception('获取RSS订阅列表失败: $e');
     }
-    throw _handleErrorResponse(response);
   }
 
   Future<RssFeed> getRssFeed(int feedId) async {
-    final response = await http
-        .get(
-          Uri.parse('$baseUrl${ApiConstants.rssFeed(feedId)}'),
-          headers: _headers,
-        )
-        .timeout(timeout);
+    try {
+      final response = await http
+          .get(
+            Uri.parse('$baseUrl${ApiConstants.rssFeed(feedId)}'),
+            headers: _headers,
+          )
+          .timeout(timeout);
 
-    if (response.statusCode == 200) {
-      final String decodedBody = utf8.decode(response.bodyBytes);
-      return RssFeed.fromJson(json.decode(decodedBody));
+      if (response.statusCode == 200) {
+        final String decodedBody = utf8.decode(response.bodyBytes);
+        final Map<String, dynamic> data = json.decode(decodedBody);
+        return RssFeed.fromJson(data);
+      }
+
+      throw _handleErrorResponse(response);
+    } catch (e) {
+      throw Exception('获取RSS订阅失败: $e');
     }
-    throw _handleErrorResponse(response);
   }
 
   Future<RssFeed> updateRssFeed(int feedId,
@@ -518,7 +533,7 @@ class ApiService {
         )
         .timeout(timeout);
 
-    if (response.statusCode != 204) {
+    if (response.statusCode != 200 && response.statusCode != 204) {
       throw _handleErrorResponse(response);
     }
   }
