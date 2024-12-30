@@ -435,27 +435,26 @@ class ApiService {
   }
 
   // RSS Feed APIs
-  Future<RssFeed> createRssFeed(String url,
-      {int? initialEntriesCount, int? updateEntriesCount}) async {
-    final response = await http
-        .post(
-          Uri.parse('$baseUrl${ApiConstants.rssFeeds}'),
-          headers: _headers,
-          body: json.encode({
-            'url': url,
-            if (initialEntriesCount != null)
-              'initial_entries_count': initialEntriesCount,
-            if (updateEntriesCount != null)
-              'update_entries_count': updateEntriesCount,
-          }),
-        )
-        .timeout(timeout);
+  Future<RssFeed> createRssFeed(Map<String, dynamic> feedData) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl${ApiConstants.rssFeeds}'),
+            headers: _headers,
+            body: json.encode(feedData),
+          )
+          .timeout(timeout);
 
-    if (response.statusCode == 201) {
-      final String decodedBody = utf8.decode(response.bodyBytes);
-      return RssFeed.fromJson(json.decode(decodedBody));
+      if (response.statusCode == 201) {
+        final String decodedBody = utf8.decode(response.bodyBytes);
+        final Map<String, dynamic> data = json.decode(decodedBody);
+        return RssFeed.fromJson(data);
+      }
+
+      throw _handleErrorResponse(response);
+    } catch (e) {
+      rethrow;
     }
-    throw _handleErrorResponse(response);
   }
 
   Future<List<RssFeed>> getRssFeeds() async {

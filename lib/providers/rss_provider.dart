@@ -29,14 +29,9 @@ class RssProvider with ChangeNotifier {
     }
   }
 
-  Future<void> addFeed(String url,
-      {int? initialEntriesCount, int? updateEntriesCount}) async {
+  Future<void> addFeed(Map<String, dynamic> feedData) async {
     try {
-      final feed = await _apiService.createRssFeed(
-        url,
-        initialEntriesCount: initialEntriesCount,
-        updateEntriesCount: updateEntriesCount,
-      );
+      final feed = await _apiService.createRssFeed(feedData);
       _feeds.add(feed);
       notifyListeners();
     } catch (e) {

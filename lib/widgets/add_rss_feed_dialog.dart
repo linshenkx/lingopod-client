@@ -12,11 +12,15 @@ class AddRssFeedDialog extends StatefulWidget {
 class _AddRssFeedDialogState extends State<AddRssFeedDialog> {
   final _formKey = GlobalKey<FormState>();
   final _urlController = TextEditingController();
+  final _initialEntriesController = TextEditingController(text: '10');
+  final _updateEntriesController = TextEditingController(text: '10');
   bool _isLoading = false;
 
   @override
   void dispose() {
     _urlController.dispose();
+    _initialEntriesController.dispose();
+    _updateEntriesController.dispose();
     super.dispose();
   }
 
@@ -24,29 +28,78 @@ class _AddRssFeedDialogState extends State<AddRssFeedDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('添加RSS订阅'),
-      content: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              controller: _urlController,
-              decoration: const InputDecoration(
-                labelText: 'RSS源URL',
-                hintText: '请输入RSS源的URL',
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextFormField(
+                controller: _urlController,
+                decoration: const InputDecoration(
+                  labelText: 'RSS源URL *',
+                  hintText: '请输入RSS源的URL',
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return '请输入URL';
+                  }
+                  final uri = Uri.tryParse(value);
+                  if (uri == null || !uri.hasAbsolutePath) {
+                    return '请输入有效的URL';
+                  }
+                  return null;
+                },
               ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return '请输入URL';
-                }
-                final uri = Uri.tryParse(value);
-                if (uri == null || !uri.hasAbsolutePath) {
-                  return '请输入有效的URL';
-                }
-                return null;
-              },
-            ),
-          ],
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _initialEntriesController,
+                      decoration: const InputDecoration(
+                        labelText: '初始文章数',
+                        hintText: '首次抓取文章数',
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return '请输入数字';
+                        }
+                        final number = int.tryParse(value);
+                        if (number == null || number <= 0) {
+                          return '请输入有效数字';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _updateEntriesController,
+                      decoration: const InputDecoration(
+                        labelText: '更新文章数',
+                        hintText: '每次更新文章数',
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return '请输入数字';
+                        }
+                        final number = int.tryParse(value);
+                        if (number == null || number <= 0) {
+                          return '请输入有效数字';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
       actions: [
@@ -76,7 +129,13 @@ class _AddRssFeedDialogState extends State<AddRssFeedDialog> {
     setState(() => _isLoading = true);
 
     try {
-      await context.read<RssProvider>().addFeed(_urlController.text);
+      final Map<String, dynamic> feedData = {
+        'url': _urlController.text,
+        'initial_entries_count': int.parse(_initialEntriesController.text),
+        'update_entries_count': int.parse(_updateEntriesController.text),
+      };
+
+      await context.read<RssProvider>().addFeed(feedData);
       if (mounted) {
         Navigator.of(context).pop(true);
       }
