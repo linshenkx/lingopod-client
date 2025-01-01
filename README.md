@@ -7,8 +7,8 @@
 LingoPod客户端是[LingoPod服务端](https://github.com/linshenkx/lingopod)的配套客户端应用程序，支持Android、Web和Windows平台。通过这款应用，用户可以在多个平台上轻松访问和收听AI生成的双语播客内容，实现随时随地的语言学习。
 
 <div align="center">
-  <img src="images/home-dark.png" width="45%" alt="主页深色模式"/>
-  <img src="images/player-dark.png" width="45%" alt="播放器深色模式"/>
+  <img src="images/home-dark.jpg" width="45%" alt="主页深色模式"/>
+  <img src="images/player-dark.jpg" width="45%" alt="播放器深色模式"/>
 </div>
 
 ## ✨ 核心特性

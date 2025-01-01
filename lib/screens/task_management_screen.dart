@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../providers/audio_provider.dart';
 import '../providers/task_provider.dart';
 import '../models/task.dart';
-import '../models/style_params.dart';
 import '../widgets/create_task_dialog.dart';
 import '../config/style_config.dart';
 import 'package:flutter/services.dart';
