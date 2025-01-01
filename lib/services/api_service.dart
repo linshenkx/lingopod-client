@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import '../config/api_constants.dart';
 import '../models/podcast.dart';
 import '../providers/settings_provider.dart';
@@ -9,6 +10,7 @@ import '../models/user.dart';
 import '../services/auth_manager.dart';
 import '../models/style_params.dart';
 import '../models/rss_feed.dart';
+import '../main.dart';
 
 class ApiService {
   static const timeout = Duration(seconds: 30);
@@ -177,6 +179,20 @@ class ApiService {
       if (response.statusCode == 200) {
         return Exception('Success');
       }
+
+      // 处理401未授权错误
+      if (response.statusCode == 401) {
+        AuthManager().clearToken();
+        // 使用全局导航器跳转到登录页面
+        if (navigatorKey.currentContext != null) {
+          Navigator.of(navigatorKey.currentContext!).pushNamedAndRemoveUntil(
+            '/login',
+            (route) => false,
+          );
+        }
+        return Exception('登录已过期，请重新登录');
+      }
+
       final String decodedBody = utf8.decode(response.bodyBytes);
       final Map<String, dynamic> error = json.decode(decodedBody);
       return Exception(error['message'] ?? '未知错误');
@@ -539,15 +555,25 @@ class ApiService {
   }
 
   Future<void> fetchRssFeed(int feedId) async {
-    final response = await http
-        .post(
-          Uri.parse('$baseUrl${ApiConstants.rssFeedFetch(feedId)}'),
-          headers: _headers,
-        )
-        .timeout(timeout);
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl${ApiConstants.rssFeedFetch(feedId)}'),
+            headers: _headers,
+          )
+          .timeout(timeout);
 
-    if (response.statusCode != 200) {
-      throw _handleErrorResponse(response);
+      if (response.statusCode != 200) {
+        throw _handleErrorResponse(response);
+      }
+    } on TimeoutException {
+      throw '请求超时，请检查网络连接';
+    } on http.ClientException catch (e) {
+      throw '网络请求失败: ${e.message}';
+    } on FormatException catch (e) {
+      throw '数据格式错误: ${e.message}';
+    } catch (e) {
+      throw '获取RSS订阅失败: ${e.toString()}';
     }
   }
 

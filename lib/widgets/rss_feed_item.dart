@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/rss_feed.dart';
 
-class RssFeedItem extends StatelessWidget {
+class RssFeedItem extends StatefulWidget {
   final RssFeed feed;
   final VoidCallback onRefresh;
   final VoidCallback onDelete;
@@ -14,6 +14,40 @@ class RssFeedItem extends StatelessWidget {
   });
 
   @override
+  State<RssFeedItem> createState() => _RssFeedItemState();
+}
+
+class _RssFeedItemState extends State<RssFeedItem> {
+  bool _isRefreshing = false;
+
+  Future<void> _handleRefresh() async {
+    if (_isRefreshing) return;
+
+    setState(() {
+      _isRefreshing = true;
+    });
+
+    try {
+      await Future(() => widget.onRefresh());
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRefreshing = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
@@ -24,7 +58,7 @@ class RssFeedItem extends StatelessWidget {
           Navigator.pushNamed(
             context,
             '/rss_entries',
-            arguments: feed,
+            arguments: widget.feed,
           );
         },
         child: Padding(
@@ -36,33 +70,43 @@ class RssFeedItem extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      feed.title,
+                      widget.feed.title,
                       style: theme.textTheme.titleMedium,
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.refresh),
-                    onPressed: onRefresh,
+                    icon: _isRefreshing
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Icon(Icons.refresh),
+                    onPressed: _isRefreshing ? null : _handleRefresh,
                     tooltip: '刷新',
                   ),
                   IconButton(
                     icon: const Icon(Icons.delete),
-                    onPressed: onDelete,
+                    onPressed: widget.onDelete,
                     tooltip: '删除',
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                feed.url,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.textTheme.bodySmall?.color,
+              if (widget.feed.url.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  widget.feed.url,
+                  style: theme.textTheme.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              if (feed.lastFetch != null) ...[
+              ],
+              if (widget.feed.lastFetch != null) ...[
                 const SizedBox(height: 4),
                 Text(
-                  '上次更新: ${feed.lastFetchDateTime.toLocal().toString().split('.')[0]}',
+                  '最后更新: ${DateTime.fromMillisecondsSinceEpoch(widget.feed.lastFetch!).toLocal().toString().split('.')[0]}',
                   style: theme.textTheme.bodySmall,
                 ),
               ],

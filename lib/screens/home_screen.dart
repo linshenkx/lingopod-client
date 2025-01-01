@@ -15,24 +15,22 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   // 添加 FocusNode 来管理焦点
   final FocusNode _searchFocusNode = FocusNode();
-  
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      
+
       final audioProvider = context.read<AudioProvider>();
       await audioProvider.refreshPodcastList();
 
       if (!mounted) return;
-      
+
       if (audioProvider.filteredPodcastList.isNotEmpty) {
         if (audioProvider.currentPodcast == null) {
-          audioProvider.setCurrentPodcast(
-            audioProvider.filteredPodcastList[0],
-            autoPlay: false
-          );
+          audioProvider.setCurrentPodcast(audioProvider.filteredPodcastList[0],
+              autoPlay: false);
         }
       }
     });
@@ -84,6 +82,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 autofocus: false,
                 decoration: InputDecoration(
                   hintText: '搜索播客...',
+                  hintStyle: const TextStyle(
+                    fontSize: 16.0,
+                    height: 1.5,
+                    letterSpacing: 0.1,
+                    leadingDistribution: TextLeadingDistribution.even,
+                    textBaseline: TextBaseline.ideographic,
+                    color: Color(0xff2c3e50),
+                    decoration: TextDecoration.none,
+                  ),
                   prefixIcon: const Icon(Icons.search),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -124,7 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           );
                         }
-                        
+
                         // 有播客时的处理
                         return SingleChildScrollView(
                           physics: const AlwaysScrollableScrollPhysics(),
@@ -135,7 +142,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             itemCount: audioProvider.filteredPodcastList.length,
                             itemBuilder: (context, index) {
                               return PodcastListItem(
-                                podcast: audioProvider.filteredPodcastList[index],
+                                podcast:
+                                    audioProvider.filteredPodcastList[index],
                                 index: index,
                               );
                             },
@@ -144,7 +152,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       },
                     ),
                   );
-
                 },
               ),
             ),
@@ -153,4 +160,4 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-} 
+}
