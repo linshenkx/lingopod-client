@@ -111,15 +111,26 @@ class _CreateTaskDialogState extends State<CreateTaskDialog> {
           onPressed: () async {
             final url = _urlController.text.trim();
             if (url.isNotEmpty) {
-              await context.read<TaskProvider>().submitTask(
-                    url,
-                    isPublic: _isPublic,
-                    styleParams: styleParams,
+              try {
+                await context.read<TaskProvider>().submitTask(
+                      url,
+                      isPublic: _isPublic,
+                      styleParams: styleParams,
+                    );
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  // 创建任务后刷新播放列表
+                  context.read<AudioProvider>().refreshPodcastList();
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('创建任务失败: ${e.toString()}'),
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                    ),
                   );
-              if (context.mounted) {
-                Navigator.pop(context);
-                // 创建任务后刷新播放列表
-                context.read<AudioProvider>().refreshPodcastList();
+                }
               }
             }
           },
